@@ -218,6 +218,38 @@ textarea{min-height:76px;resize:vertical;line-height:1.6;}
   background:#F2F5F9;border:1px solid var(--line);border-radius:5px;
   padding:8px 12px;font-size:10.5pt;color:var(--navy);margin-bottom:6px;}
 
+/* シミュレーション表示 */
+.bars{display:flex;align-items:flex-end;gap:24px;height:105mm;margin:18px 10mm 0;}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
+.bar .amt{font-size:22pt;font-weight:800;color:var(--navy);margin-bottom:6px;white-space:nowrap;}
+.bar .amt small{font-size:12pt;}
+.bar .col{width:100%;background:var(--navy-soft);border-radius:4px 4px 0 0;min-height:4px;}
+.bar.hi .col{background:var(--orange);}
+.bar.hi .amt{color:var(--orange);font-size:26pt;}
+.bar .cap{margin-top:10px;font-size:12pt;font-weight:700;color:var(--ink);text-align:center;line-height:1.4;}
+.bar .sub2{font-size:10.5pt;color:var(--sub);font-weight:500;}
+.baseline{border-top:2px solid var(--navy);margin:0 10mm;}
+.simnote{
+  margin:24px 0 0;border:3px solid var(--navy);border-radius:8px;padding:16px 20px;font-size:13pt;line-height:1.9;}
+.simnote b{font-size:20pt;color:var(--orange);}
+.vs{display:flex;gap:14px;margin-top:16px;}
+.vs>div{flex:1;border-radius:8px;padding:16px;text-align:center;}
+.vs .a{border:3px solid var(--orange);background:#FDF3E7;}
+.vs .b{border:3px solid #8895AB;background:#F2F5F9;}
+.vs h4{margin:0 0 10px;font-size:14pt;}
+.vs .a h4{color:var(--orange);} .vs .b h4{color:#5A6880;}
+.vs .big{font-size:28pt;font-weight:800;line-height:1.2;}
+.vs .big small{font-size:13pt;}
+.vs .lb{font-size:11pt;color:var(--sub);margin-top:8px;}
+
+/* 印刷範囲 */
+@media print{
+  body.only-sim .page:not(.scope-sim){display:none !important;}
+  body.only-teian .page.scope-sim{display:none !important;}
+}
+.scope{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:var(--navy);}
+.scope select{width:auto;padding:7px 8px;font-size:14px;}
+
 /* 判定条件フォーム */
 .cond-row{display:flex;align-items:center;gap:10px;margin-top:10px;}
 .cond-row .cl{flex:1;font-size:15px;font-weight:700;color:var(--sub);}
@@ -259,6 +291,14 @@ textarea{min-height:76px;resize:vertical;line-height:1.6;}
 
   <div class="actions">
     <button class="btn print" onclick="window.print()">印刷・PDF保存</button>
+    <div class="scope">印刷する範囲
+      <select id="scopeSel" onchange="setScope(this.value)">
+        <option value="all">提案書ぜんぶ</option>
+        <option value="only-sim">資金計画だけ</option>
+        <option value="only-teian">資金計画をのぞく</option>
+      </select>
+    </div>
+    <button class="btn ghost" onclick="jumpSim()">資金計画の画面へ</button>
     <button class="btn ghost" onclick="saveJson()">入力を保存</button>
     <button class="btn ghost" onclick="document.getElementById('loadJson').click()">保存を読み込む</button>
     <input type="file" id="loadJson" accept=".json" style="display:none" onchange="loadJsonFile(this)">
@@ -270,6 +310,12 @@ textarea{min-height:76px;resize:vertical;line-height:1.6;}
     <button class="btn ghost" onclick="document.getElementById('xlsFile').click()">過去のエクセルを読み込む</button>
     <input type="file" id="xlsFile" accept=".xlsx,.xlsm" style="display:none" onchange="readXls(this)">
     <div class="calc" id="xlsBox">まだ読み込んでいません</div>
+
+    <label>Zohoの顧客情報を貼り付け</label>
+    <p class="hint">Zohoの顧客画面を範囲選択してコピーし、そのまま貼ってください。氏名・担当者・年齢を拾います。</p>
+    <textarea id="zohoBox" style="min-height:90px" placeholder="氏名　藤本 雅三&#10;顧客タイプ　不動産買い&#10;【買】担当者&#10;木下 和恵"></textarea>
+    <button class="btn ghost" onclick="parseZoho()">貼り付けた内容を読み取る</button>
+    <div class="calc" id="zohoResult">—</div>
 
     <label>お客様のお名前</label>
     <input type="text" data-k="customer" placeholder="藤井　宏輔・愛理">
@@ -490,7 +536,10 @@ const propFields = [
   {k:"plan", l:"間取り", ph:"4LDK"},
   {k:"floor", l:"構造・階数", ph:"木造 2階建"},
   {k:"road", l:"前面道路", ph:"南5m・東9m　角地"},
-  {k:"school", l:"小学校・中学校", ph:"〇〇小学校 徒歩10分／〇〇中学校 徒歩11分"},
+  {k:"station", l:"最寄駅の名前（地図用）", ph:"稲荷町駅"},
+  {k:"elem", l:"小学校の名前（地図用）", ph:"富山市立堀川小学校"},
+  {k:"junior", l:"中学校の名前（地図用）", ph:"富山市立堀川中学校"},
+  {k:"school", l:"小学校・中学校（提案書に出る文）", ph:"堀川小学校 徒歩10分／堀川中学校 徒歩11分"},
   {k:"life", l:"周辺施設", ph:"スーパー450m／コンビニ450m／ドラッグストア500m"},
   {k:"merit", l:"メリット（1行1つ）", t:"area", ph:"人気の角地物件\n各居室2面採光\n南向きで陽当たり良好\nこだわりリノベが可能"},
   {k:"demerit", l:"気になる点（1行1つ）", t:"area", ph:"駐車が少し入れにくい\n和室の設備が古い"}
@@ -509,7 +558,12 @@ function buildPropPanel(i){
       ? `<textarea data-p="${i}" data-k="${f.k}" placeholder="${f.ph}"></textarea>`
       : `<input type="${f.t||"text"}" data-p="${i}" data-k="${f.k}" placeholder="${f.ph}">`;
   });
-  h += `<label>画像（外観・間取り・地図・周辺情報）</label>
+  h += `<label>地図リンクと図面</label>
+    <button class="mini" onclick="mapLinks(${i})">地図リンクを作る</button>
+    <button class="mini" onclick="document.getElementById('plan${i}').click()">図面PDFを取り込む</button>
+    <input type="file" id="plan${i}" accept="application/pdf" style="display:none" onchange="readPlanPdf(${i},this)">
+    <div id="maps${i}"></div>
+    <label>画像（外観・間取り・地図・周辺情報）</label>
     <p class="hint">スクリーンショットをそのまま追加できます。追加した順に「周辺情報」ページへ並びます。</p>
     <button class="mini" onclick="pickImg(${i})">画像を追加</button>
     <input type="file" id="file${i}" accept="image/*" multiple style="display:none" onchange="addImgs(${i},this)">
@@ -522,6 +576,9 @@ function renderImgList(i){
     <div class="imgrow">
       <img class="thumb" src="${im.src}" alt="">
       <input type="text" value="${esc(im.cap)}" oninput="P[${i}].imgs[${j}].cap=this.value;render()" placeholder="説明（例：駅までの徒歩ルート）">
+      <label style="margin:0;font-size:13px;white-space:nowrap;display:flex;align-items:center;gap:4px">
+        <input type="checkbox" style="width:20px;height:20px;accent-color:#16294B" ${im.full?"checked":""}
+          onchange="P[${i}].imgs[${j}].full=this.checked;render()">1頁</label>
       <button class="mini" onclick="P[${i}].imgs.splice(${j},1);renderImgList(${i});render()">削除</button>
     </div>`).join("");
 }
@@ -575,6 +632,85 @@ function parseRows(text){
     if(cut.length > COLS.length) o.cmt = cut.slice(COLS.length-1).join(" ");
     return o;
   });
+}
+
+/* ---------- Zohoの顧客情報を読み取る ---------- */
+function parseZoho(){
+  const raw = document.getElementById("zohoBox").value;
+  const out = document.getElementById("zohoResult");
+  const ls = raw.split("\n").map(s=>s.replace(/\u3000/g," ").trimEnd());
+  const val = {};
+  for(let i=0;i<ls.length;i++){
+    const line = ls[i].trim();
+    if(!line) continue;
+    const parts = ls[i].split(/\t| {2,}/).map(s=>s.trim()).filter(s=>s!=="");
+    const lab = parts[0] || "";
+    let v = parts.slice(1).join(" ").trim();
+    if(!v){
+      for(let j=i+1;j<ls.length && j<=i+2;j++){
+        const nx = ls[j].trim();
+        if(nx && !/^[-ー]$/.test(nx) && !/\t/.test(ls[j])){ v = nx; break; }
+      }
+    }
+    if(!v || /^[-ー]$/.test(v)) continue;
+    if(!(lab in val)) val[lab] = v;
+  }
+  const got = [];
+  const name = val["氏名"] || val["顧客名"] || val["お名前"];
+  if(name){ S.customer = name; got.push("お名前 "+name); }
+  const staff = val["【買】担当者"] || val["【売】担当者"] || val["担当者"];
+  if(staff){ S.staff = staff; got.push("担当 "+staff); }
+  const age = (val["年齢"]||"").match(/\d+/);
+  if(age){ S.sim_age = age[0]; got.push("年齢 "+age[0]+"歳"); }
+
+  syncInputs(); render();
+  out.innerHTML = got.length ? "読み取りました：" + got.join("　／　")
+    : "拾えませんでした。氏名の行が含まれているか確認してください。";
+}
+
+/* ---------- 地図リンクの一括生成 ---------- */
+function mapLinks(i){
+  const d = P[i], box = document.getElementById("maps"+i);
+  const from = (d.addr||"").trim();
+  if(!from){ box.innerHTML = '<p class="hint">先に所在地を入れてください。</p>'; return; }
+  const A = (href, label) => `<a class="mini" style="display:inline-block;margin:4px 4px 0 0;text-decoration:none"
+      href="${href}" target="_blank" rel="noopener">${label}</a>`;
+  const route = (to, label) => to ? A(
+      `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(from)}&destination=${encodeURIComponent(to)}&travelmode=walking`,
+      label) : "";
+  const near = (q) => A(
+      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q+" "+from)}`, q);
+  box.innerHTML =
+    '<p class="hint">クリックすると地図が開きます。画面を撮って、下の「画像を追加」で取り込んでください。</p>' +
+    route(d.station,"駅まで") + route(d.elem,"小学校まで") + route(d.junior,"中学校まで") +
+    ["スーパー","コンビニ","ドラッグストア","病院","公園"].map(near).join("");
+}
+
+/* ---------- 図面PDFを画像として取り込む ---------- */
+async function readPlanPdf(i, input){
+  const f = input.files[0]; input.value = "";
+  if(!f) return;
+  const box = document.getElementById("maps"+i);
+  box.innerHTML = '<p class="hint">図面を読み込んでいます…</p>';
+  try{
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    const pdf = await pdfjsLib.getDocument({data: await f.arrayBuffer()}).promise;
+    const max = Math.min(pdf.numPages, 3);
+    for(let p=1;p<=max;p++){
+      const page = await pdf.getPage(p);
+      const vp = page.getViewport({scale:2});
+      const cv = document.createElement("canvas");
+      cv.width = vp.width; cv.height = vp.height;
+      await page.render({canvasContext: cv.getContext("2d"), viewport: vp}).promise;
+      P[i].imgs.push({src: cv.toDataURL("image/jpeg",0.85),
+        cap: max>1 ? `物件図面（${p}枚目）` : "物件図面", full:true});
+    }
+    renderImgList(i); render();
+    box.innerHTML = `<p class="hint">図面を ${max} 枚、1ページずつ差し込みました。</p>`;
+  }catch(e){
+    box.innerHTML = '<p class="hint">読み込めませんでした：'+e.message+'</p>';
+  }
 }
 
 function syncInputs(){
@@ -964,6 +1100,85 @@ function pageList(title, sub, text, startNo, tag){
   return pages;
 }
 
+function pageSim1(no){
+  const k = simKariire();
+  const vals = [
+    {v:k.rent,   cap:"今の家賃と同じなら", sub:`月 ${n(S.sim_rent)+n(S.sim_kyoueki)+n(S.sim_park)||"—"} 万円`},
+    {v:k.income, cap:"ご年収の基準では",   sub:`審査金利 ${S.sim_shinsa||"—"}％・負担率 ${S.sim_ratio||"—"}％`},
+    {v:k.hope,   cap:"ご希望の返済額なら", sub:`月 ${S.month||"—"} 万円`}
+  ];
+  if(!vals.some(x=>x.v>0)) return "";
+  const max = Math.max(...vals.map(x=>x.v));
+  const hi = vals.indexOf(vals.find(x=>x.v===k.hope));
+  const bars = vals.map((x,i)=>`
+    <div class="bar ${i===hi?"hi":""}">
+      <div class="amt">${man(Math.round(x.v))}<small>万円</small></div>
+      <div class="col" style="height:${max? Math.max(4, x.v/max*74):4}%"></div>
+      <div class="cap">${x.cap}<span class="sub2">${x.sub}</span></div>
+    </div>`).join("");
+
+  return shell(no+"枚目：借入可能額","scope-sim",
+    head("いくらお借りになれるか", "3つの基準で試算しました") +
+    `<div class="bars">${bars}</div><div class="baseline"></div>
+     <div class="simnote">
+       ご希望の月々 ${esc(S.month||"—")} 万円でご返済される場合、お借入は
+       <b>${man(Math.round(k.hope))}</b> 万円です。<br>
+       返済期間 ${esc(S.years||"—")}年・金利 ${esc(S.rate||"—")}％で計算しています。
+     </div>
+     <p class="legend-note" style="margin-top:16px">
+       ※ 実際のご融資額とご融資条件は、金融機関の審査により決定します。<br>
+       ※ 金利は試算時点のものです。</p>`);
+}
+function pageSim2(no){
+  const h = simHikaku();
+  if(!h) return "";
+  const yen = Math.round(h.day).toLocaleString("ja-JP");
+  return shell(no+"枚目：今買う場合と先に延ばした場合","scope-sim",
+    head("今ご購入する場合と、先に延ばす場合", `${h.after}年後と比べています`) +
+    `<div class="vs">
+      <div class="a"><h4>今ご購入する場合</h4>
+        <div class="big">${man(Math.round(h.now.sum))}<small>万円</small></div>
+        <div class="lb">住居費の総額</div></div>
+      <div class="b"><h4>${h.after}年後にご購入する場合</h4>
+        <div class="big">${man(Math.round(h.fut.sum))}<small>万円</small></div>
+        <div class="lb">住居費の総額（家賃を含む）</div></div>
+     </div>
+     <table class="breakdown" style="margin-top:20px">
+      <tr><th style="width:40%">　</th>
+        <th style="background:var(--orange);color:#fff;text-align:center">今ご購入</th>
+        <th style="background:#6B7A93;color:#fff;text-align:center">${h.after}年後</th></tr>
+      <tr><th>ローンのご返済総額</th>
+        <td style="text-align:center">${man(Math.round(h.now.pay))} 万円</td>
+        <td style="text-align:center">${man(Math.round(h.fut.pay))} 万円</td></tr>
+      <tr><th>ご自身で出される資金</th>
+        <td style="text-align:center">${man(Math.round(h.now.jiko))} 万円</td>
+        <td style="text-align:center">${man(Math.round(h.fut.jiko))} 万円</td></tr>
+      <tr><th>それまでの家賃</th>
+        <td style="text-align:center">—</td>
+        <td style="text-align:center">${man(Math.round(h.fut.yachin))} 万円</td></tr>
+      <tr><th>65歳時のローン残高</th>
+        <td style="text-align:center;font-size:17pt;color:var(--navy)">${man(Math.round(h.now.zansai))} 万円</td>
+        <td style="text-align:center;font-size:17pt;color:#D0021B">${man(Math.round(h.fut.zansai))} 万円</td></tr>
+     </table>
+     <div class="simnote" style="text-align:center">
+       ${h.diff>=0 ? "今ご購入されるほうが" : `${h.after}年後にご購入されるほうが`}
+       <b>${man(Math.abs(Math.round(h.diff)))}</b> 万円 おトクです<br>
+       <span style="font-size:12pt">1日あたりに換算すると ${Math.abs(Math.round(h.day)).toLocaleString("ja-JP")} 円です</span>
+     </div>
+     <p class="legend-note" style="margin-top:14px">
+       ※ 65歳時のローン残高は、お借入の元金の残りです。<br>
+       ※ ${h.after}年後は、物件価格の上昇率 ${esc(S.sim_up||"0")}％、金利 ${esc(S.sim_rate_f||S.rate||"—")}％で計算しています。</p>`);
+}
+function setScope(v){
+  document.body.classList.remove("only-sim","only-teian");
+  if(v!=="all") document.body.classList.add(v);
+}
+function jumpSim(){
+  const el = [...document.querySelectorAll(".page.scope-sim")][0];
+  if(el) el.scrollIntoView({behavior:"smooth", block:"start"});
+  else alert("「6. 借入可能額の試算」に家賃かご年収、ご希望の返済額を入れてください。");
+}
+
 /* ========== プレビュー描画 ========== */
 function render(){
   const total = n(S.loan) + n(S.own);
@@ -999,9 +1214,13 @@ function render(){
   if(S.useSale) addMany(p => pageList("いま売り出されている物件", "ご希望条件と照らし合わせました", S.saleData, p, "売出一覧"));
   if(S.useSold) addMany(p => pageList("このエリアの成約事例", "実際に売買が成立した価格です", S.soldData, p, "成約事例"));
   add(p => pageMoney(p, total));
+  add(p => pageSim1(p));
+  add(p => pageSim2(p));
   add(p => pageProp(0, p));
+  addMany(p => pageFull(0, p));
   add(p => pageImgs(0, p));
   add(p => pageProp(1, p));
+  addMany(p => pageFull(1, p));
   add(p => pageImgs(1, p));
   add(p => pageCompare(p));
   add(p => pageText("プロとしてお伝えしたいこと", S.proTitle, S.proBody, p));
@@ -1113,7 +1332,8 @@ function pageProp(i, no){
         <tr><th style="background:var(--navy);color:#fff">物件＋リノベ 合計</th>
         <td style="background:#FDF3E7;color:var(--orange);font-size:16pt;font-weight:800">${man(p+r)} 万円</td></tr></table>`;
 
-  const first = d.imgs[0];
+  const small = d.imgs.filter(im=>!im.full);
+  const first = small[0];
   const img = first
     ? `<div class="imgcell" style="margin-top:14px"><img src="${first.src}" alt="">
        ${first.cap?`<div class="cap">${esc(first.cap)}</div>`:""}</div>`
@@ -1125,7 +1345,7 @@ function pageProp(i, no){
       <span class="p">${man(p)}<small>万円</small></span></div>` + t + img);
 }
 function pageImgs(i, no){
-  const rest = P[i].imgs.slice(1, 5);
+  const rest = P[i].imgs.filter(im=>!im.full).slice(1, 5);
   let g = `<div class="imggrid">`;
   for(let j=0;j<4;j++){
     const im = rest[j];
@@ -1136,6 +1356,14 @@ function pageImgs(i, no){
   g += `</div>`;
   return shell(no+"枚目：物件"+(i+1)+" 周辺情報","",
     head("物件"+(i===0?"①":"②")+"　周辺情報", esc(P[i].addr||"")) + g);
+}
+function pageFull(i, startNo){
+  return P[i].imgs.filter(im=>im.full).map((im,j)=>
+    shell((startNo+j)+"枚目：物件"+(i+1)+" 図面","",
+      head("物件"+(i===0?"①":"②")+"　"+(im.cap||"図面"), esc(P[i].addr||"")) +
+      `<div style="margin-top:10px;text-align:center">
+         <img src="${im.src}" style="max-width:100%;max-height:225mm;object-fit:contain">
+       </div>`));
 }
 function pageCompare(no){
   const cell = (i)=>{

@@ -442,7 +442,38 @@ body.mode-sim .page:not(.scope-sim){display:none;}
   </fieldset>
 
   <fieldset class="tab-doc">
-    <legend>5. 資金計画</legend>
+    <legend>5. 成約データ（過去5年）</legend>
+    <p class="hint">富山市の成約実績から、ご希望条件に合う物件がどれくらい出ているかを出します。</p>
+    <div class="calc" id="dbBox">データを読み込んでいます…</div>
+    <button class="mini" id="dbPick" style="display:none"
+      onclick="document.getElementById('dbFiles').click()">データファイルを選ぶ</button>
+    <input type="file" id="dbFiles" multiple accept=".json,.js" style="display:none" onchange="loadDbFiles(this)">
+
+    <div class="toggle"><input type="checkbox" data-k="useDb"><span>成約データのページを載せる</span></div>
+    <div class="row">
+      <div><label>種別</label><select data-k="sdKind">
+        <option value="mansion">中古マンション</option><option value="kodate">中古戸建て</option></select></div>
+      <div><label>小学校区</label><select data-k="sdSchool" id="sdSchool"><option value="">指定しない</option></select></div>
+    </div>
+    <div class="row">
+      <div><label>町名（部分一致）</label><input type="text" data-k="sdTown" placeholder="天正寺"></div>
+      <div><label>最寄駅</label><input type="text" data-k="sdStation" placeholder="稲荷町"></div>
+    </div>
+    <div class="row">
+      <div><label>面積（㎡以上）</label><input type="number" data-k="sdArea" placeholder="65"></div>
+      <div><label>土地面積（㎡以上）</label><input type="number" data-k="sdLand"></div>
+      <div><label>居室数（以上）</label><input type="number" data-k="sdRooms" placeholder="3"></div>
+    </div>
+    <div class="row">
+      <div><label>価格の下限（万円）</label><input type="number" data-k="sdPriceMin"></div>
+      <div><label>価格の上限（万円）</label><input type="number" data-k="sdPriceMax" placeholder="3000"></div>
+      <div><label>築年（西暦以降）</label><input type="number" data-k="sdBuilt" placeholder="2000"></div>
+    </div>
+    <div class="calc" id="sdBox">—</div>
+  </fieldset>
+
+  <fieldset class="tab-doc">
+    <legend>6. 資金計画</legend>
     <div class="row">
       <div><label>借入総額（万円）</label><input type="number" data-k="loan" placeholder="4000"></div>
       <div><label>自己資金（万円）</label><input type="number" data-k="own" placeholder="200"></div>
@@ -514,17 +545,17 @@ body.mode-sim .page:not(.scope-sim){display:none;}
   </fieldset>
 
   <fieldset class="tab-doc">
-    <legend>6. 物件①</legend>
+    <legend>7. 物件①</legend>
     <div id="prop1"></div>
   </fieldset>
 
   <fieldset class="tab-doc">
-    <legend>7. 物件②</legend>
+    <legend>8. 物件②</legend>
     <div id="prop2"></div>
   </fieldset>
 
   <fieldset class="tab-doc">
-    <legend>8. 固定ページの文章</legend>
+    <legend>9. 固定ページの文章</legend>
     <p class="hint">一度書けば毎回そのまま使えます。保存ボタンで残しておいてください。</p>
     <label>ごあいさつ 見出し</label>
     <input type="text" data-k="greetTitle" placeholder="家に暮らしを合わせるのではなく、暮らしに家を合わせる。">
@@ -556,7 +587,9 @@ const defaults = {
   c_budget:true, v_budget:"", c_walk:false, v_walk:"", c_age:false, v_age:"",
   c_quake:true, v_quake:"new", c_land:false, v_land:"", c_bldg:false, v_bldg:"",
   c_madori:false, v_madori:"", c_school:false, v_school:"",
-  listLimit:"50", listSort:true, useSale:true, saleData:"", useSold:false, soldData:"", excOC:true, excMoushi:false,
+  listLimit:"50", listSort:true,
+  useDb:true, sdKind:"mansion", sdSchool:"", sdTown:"", sdStation:"", sdArea:"", sdLand:"",
+  sdRooms:"", sdPriceMin:"", sdPriceMax:"", sdBuilt:"", useSale:true, saleData:"", useSold:false, soldData:"", excOC:true, excMoushi:false,
   income:"", lp_now:"", lp_future:"", lp_zansai:"", lp_zansai_f:"", lp_diff:"", lp_day:"", lp_after:"",
   sim_rent:"", sim_kyoueki:"", sim_park:"", sim_income:"", sim_income2:"", sim_ratio:"35",
   sim_exist:"", sim_shinsa:"3", sim_age:"", sim_after:"3", sim_tsumi:"", sim_rent2:"",
@@ -685,6 +718,131 @@ function parseRows(text){
     if(cut.length > COLS.length) o.cmt = cut.slice(COLS.length-1).join(" ");
     return o;
   });
+}
+
+/* ---------- 成約データ（funnel-data.json / school-lookup.js） ---------- */
+let DB = null;
+async function loadDb(){
+  const box = document.getElementById("dbBox");
+  try{
+    if(typeof SchoolLookup === "undefined"){
+      const js = await (await fetch("school-lookup.js")).text();
+      (0,eval)(js);
+    }
+    DB = await (await fetch("funnel-data.json")).json();
+    afterDbLoad();
+  }catch(e){
+    box.innerHTML = "成約データを読み込めませんでした。<br>"
+      + "同じ場所に <b>funnel-data.json</b> と <b>school-lookup.js</b> を置いてください。"
+      + "（この画面で試す場合は下のボタンから2つ選んでください）";
+    document.getElementById("dbPick").style.display = "inline-block";
+  }
+}
+async function loadDbFiles(input){
+  const files = [...input.files]; input.value = "";
+  try{
+    for(const f of files){
+      const t = await f.text();
+      if(/\.js$/i.test(f.name)) (0,eval)(t);
+      else DB = JSON.parse(t);
+    }
+    if(!DB || typeof SchoolLookup === "undefined")
+      throw new Error("2つとも選んでください（funnel-data.json と school-lookup.js）");
+    afterDbLoad();
+  }catch(e){
+    document.getElementById("dbBox").textContent = "読み込めませんでした：" + e.message;
+  }
+}
+function afterDbLoad(){
+  const sel = document.getElementById("sdSchool");
+  const list = (DB.school && DB.school.sho_list) || [];
+  sel.innerHTML = '<option value="">指定しない</option>' +
+    list.map(x=>`<option value="${esc(x)}">${esc(x)}小学校</option>`).join("");
+  sel.value = S.sdSchool || "";
+  document.getElementById("dbPick").style.display = "none";
+  document.getElementById("dbBox").innerHTML =
+    `成約データ読み込み済み　マンション <b>${DB.sold_mansion.recs.length}</b> 件　`
+    + `戸建て <b>${DB.sold_kodate.recs.length}</b> 件`;
+  render();
+}
+/* 校区は「候補に含まれる」ものも数に入れる */
+const matchSchool = (r, name) =>
+  (r.school_confident && r.school === name) ||
+  (!r.school_confident && Array.isArray(r.school) && r.school.includes(name));
+
+function sdRecs(){ return DB ? (S.sdKind==="kodate" ? DB.sold_kodate.recs : DB.sold_mansion.recs) : []; }
+function sdFilter(recs, o){
+  o = o || {};
+  const g = k => (o[k]!==undefined ? o[k] : S[k]);
+  return recs.filter(r=>{
+    if(g("sdSchool") && !matchSchool(r, g("sdSchool"))) return false;
+    if(g("sdTown") && !String(r.town||"").includes(g("sdTown"))) return false;
+    if(g("sdStation") && !String(r.station||"").includes(g("sdStation"))) return false;
+    if(n(g("sdArea")) && !(r.area >= n(g("sdArea")))) return false;
+    if(n(g("sdLand")) && !(r.land_area >= n(g("sdLand")))) return false;
+    if(n(g("sdPriceMin")) && !(r.price >= n(g("sdPriceMin")))) return false;
+    if(n(g("sdPriceMax")) && !(r.price <= n(g("sdPriceMax")))) return false;
+    if(n(g("sdRooms"))){
+      const m = han(r.madori).match(/(\d+)/);
+      if(!m || +m[1] < n(g("sdRooms"))) return false;
+    }
+    if(n(g("sdBuilt")) && (!r.built_y || r.built_y < n(g("sdBuilt")))) return false;
+    return true;
+  });
+}
+function median(a){
+  const s = [...a].sort((x,y)=>x-y), k = s.length;
+  if(!k) return 0;
+  return k%2 ? s[(k-1)/2] : Math.round((s[k/2-1]+s[k/2])/2);
+}
+function sdStats(){
+  if(!DB) return null;
+  const recs = sdRecs(), hit = sdFilter(recs);
+  const sorted = [...hit].sort((a,b)=>(b.deal_y-a.deal_y)||(b.deal_m-a.deal_m));
+  const p = hit.map(r=>r.price).filter(x=>x>0);
+  const noBuilt = recs.filter(r=>!r.built_y).length;
+  return {
+    all: recs.length, hit, sorted, count: hit.length,
+    perYear: hit.length/5,
+    months: hit.length ? (60/hit.length) : 0,
+    uncertain: hit.filter(r=>!r.school_confident && S.sdSchool).length,
+    min: p.length?Math.min(...p):0, max: p.length?Math.max(...p):0, med: median(p),
+    noBuilt
+  };
+}
+/* 0件のときに広げる案を出す */
+function sdSuggest(){
+  const recs = sdRecs(), out = [];
+  if(S.sdSchool){
+    const c = sdFilter(recs, {sdSchool:""}).length;
+    if(c) out.push({t:"小学校区の条件を外す", c});
+  }
+  if(n(S.sdPriceMax)){
+    const base = sdFilter(recs, {sdPriceMax:""});
+    const over = base.map(r=>r.price).filter(x=>x > n(S.sdPriceMax)).sort((a,b)=>a-b);
+    [0,2,5].forEach(i=>{
+      if(over[i]){
+        const up = Math.ceil(over[i]/100)*100;
+        const c = sdFilter(recs, {sdPriceMax:String(up)}).length;
+        if(c && !out.some(x=>x.c===c)) out.push({t:`${man(up)}万円まで広げる`, c});
+      }
+    });
+  }
+  if(n(S.sdArea)){
+    const step = Math.max(0, n(S.sdArea)-10);
+    const c = sdFilter(recs, {sdArea:String(step)}).length;
+    if(c) out.push({t:`面積を ${step}㎡以上まで広げる`, c});
+  }
+  if(n(S.sdBuilt)){
+    const c = sdFilter(recs, {sdBuilt:String(n(S.sdBuilt)-10)}).length;
+    if(c) out.push({t:`築年を ${n(S.sdBuilt)-10}年以降まで広げる`, c});
+  }
+  return out.slice(0,4);
+}
+/* 町名から校区を引く（物件カード用） */
+function schoolOf(town){
+  if(!DB || typeof SchoolLookup === "undefined" || !town) return null;
+  try{ return SchoolLookup.of(town, DB.school, DB.override); }catch(e){ return null; }
 }
 
 /* ---------- Zohoの顧客情報を読み取る ---------- */
@@ -1281,6 +1439,12 @@ function render(){
     ご希望の返済額なら <b>${man(Math.round(k.hope))}</b> 万円 ${k.hope>0?use(k.hope):""}`
     : "家賃・年収・ご希望の返済額のどれかを入れてください";
 
+  const st = sdStats();
+  const sb = document.getElementById("sdBox");
+  if(sb) sb.innerHTML = !DB ? "データ未読み込み"
+    : st.count ? `該当 <b>${man(st.count)}</b> 件（${S.sdSchool&&st.uncertain?`うち候補扱い ${st.uncertain}件・`:""}母数 ${man(st.all)}件）　年平均 <b>${st.perYear.toFixed(1)}</b> 件　価格 ${man(st.min)}〜${man(st.max)}／中央値 <b>${man(st.med)}</b> 万円`
+    : `該当 <b>0</b> 件　` + (sdSuggest().map(x=>`${esc(x.t)}→${x.c}件`).join("　／　") || "条件を見直してください");
+
   const h = simHikaku();
   document.getElementById("simBox2").innerHTML = h ? `
     住居費の総額　今 <b>${man(Math.round(h.now.sum))}</b> 万円　／　${h.after}年後 <b>${man(Math.round(h.fut.sum))}</b> 万円<br>
@@ -1299,6 +1463,7 @@ function render(){
   add(p => pageFunnel(p));
   const addMany = fn => { fn(no).forEach(s=>{ parts.push(s); no++; }); };
   if(S.useSale) addMany(p => pageList("いま売り出されている物件", "ご希望条件と照らし合わせました", S.saleData, p, "売出一覧"));
+  if(S.useDb) add(p => pageSold(p));
   if(S.useSold) addMany(p => pageList("このエリアの成約事例", "実際に売買が成立した価格です", S.soldData, p, "成約事例"));
   add(p => pageMoney(p, total));
   add(p => pageSim1(p));
@@ -1440,6 +1605,8 @@ function pageProp(i, no){
     ["築年月", d.built], ["間取り", d.plan], ["構造・階数", d.floor],
     ["前面道路", d.road], ["通学先", d.school], ["周辺施設", d.life]
   ];
+  const sc = schoolOf((d.addr||"").replace(/^.*?[市区]/,"").replace(/\d+[-－‐].*$/,"").trim());
+  if(sc) spec.splice(7, 0, ["校区", sc.label + (sc.chu ? `／${sc.chu}中学校` : "")]);
   let t = `<table class="spec">`;
   spec.forEach(([l,v])=> t += `<tr><th>${l}</th><td>${v? esc(v) : '<span class="empty">—</span>'}</td></tr>`);
   t += `<tr><th>リノベ概算</th><td>${man(r)} 万円</td></tr>
@@ -1504,6 +1671,77 @@ function pageAround(i, no){
        <div class="hub"><b>ご提案物件</b><span>${esc(d.addr||"")}</span></div>${spots}
      </div>`);
 }
+function pageSold(no){
+  const st = sdStats();
+  if(!st) return "";
+  const kind = S.sdKind==="kodate" ? "中古戸建て" : "中古マンション";
+  const cond = [];
+  if(S.sdSchool) cond.push(esc(S.sdSchool)+"小学校区");
+  if(S.sdTown) cond.push(esc(S.sdTown));
+  if(S.sdStation) cond.push(esc(S.sdStation)+"駅");
+  if(n(S.sdArea)) cond.push(S.sdArea+"㎡以上");
+  if(n(S.sdLand)) cond.push("土地"+S.sdLand+"㎡以上");
+  if(n(S.sdRooms)) cond.push(S.sdRooms+"LDK以上");
+  if(n(S.sdPriceMin)||n(S.sdPriceMax))
+    cond.push((n(S.sdPriceMin)?man(S.sdPriceMin)+"万円":"")+"〜"+(n(S.sdPriceMax)?man(S.sdPriceMax)+"万円":""));
+  if(n(S.sdBuilt)) cond.push("築"+S.sdBuilt+"年以降");
+
+  const strip = `<div class="cond-strip">${kind}　${cond.length?cond.join("　／　"):"条件の指定なし"}　（2021〜2025年の成約実績）</div>`;
+
+  if(!st.count){
+    const sug = sdSuggest();
+    return shell(no+"枚目：成約実績","",
+      head("ご条件に合う成約実績","過去5年の富山市の成約データから") + strip +
+      `<div class="simnote" style="text-align:center">
+         ご条件に合う成約は、過去5年で <b>1件もありません</b><br>
+         <span style="font-size:12pt">それだけ希少な条件であり、出会えたときの判断が重要になります</span>
+       </div>` +
+      (sug.length ? `<table class="breakdown" style="margin-top:20px">
+         <tr><th colspan="2" style="background:var(--navy);color:#fff;text-align:center">条件を少し広げた場合</th></tr>
+         ${sug.map(x=>`<tr><th>${esc(x.t)}</th><td>${man(x.c)} 件</td></tr>`).join("")}
+       </table>` : ""));
+  }
+
+  const rows = st.sorted.slice(0,8).map(r=>{
+    const mark = (S.sdSchool && !r.school_confident) ? '<span style="color:#D0021B">※</span>' : "";
+    const nm = S.sdKind==="kodate" ? esc(r.town||"") : esc(r.name || r.town || "");
+    const area = S.sdKind==="kodate"
+      ? `${r.land_area||"—"} / ${r.bldg_area||r.area||"—"}` : (r.area||"—");
+    return `<tr>
+      <td>${r.deal_y}年${r.deal_m}月</td>
+      <td class="name">${nm}${mark}</td>
+      <td>${area}</td>
+      <td>${esc(han(r.madori||""))}</td>
+      <td>${r.built_y? r.built_y+"年" : "—"}</td>
+      <td style="font-weight:800;color:var(--orange);font-size:13pt">${man(r.price)}</td></tr>`;
+  }).join("");
+
+  const rest = st.count - Math.min(8, st.count);
+  const pace = st.months >= 1
+    ? `およそ <b>${st.months.toFixed(1)}</b> か月に1件のペースです`
+    : `月に <b>${(1/st.months).toFixed(1)}</b> 件ほど出ています`;
+
+  return shell(no+"枚目：成約実績","",
+    head("ご条件に合う成約実績","過去5年の富山市の成約データから") + strip +
+    `<div class="simnote">
+       ご条件に合う成約は過去5年で <b>${man(st.count)}</b> 件、年平均 <b>${st.perYear.toFixed(1)}</b> 件。<br>${pace}
+     </div>
+     <table class="list" style="margin-top:18px"><thead><tr>
+       <th>成約年月</th><th>${S.sdKind==="kodate"?"所在":"建物名"}</th>
+       <th>${S.sdKind==="kodate"?"土地 / 建物":"専有"}<span class="sub">㎡</span></th>
+       <th>間取り</th><th>築年</th><th>成約価格<span class="sub">万円</span></th>
+     </tr></thead><tbody>${rows}</tbody></table>
+     ${rest>0 ? `<p class="legend-note">※ このほかに ${man(rest)} 件あり、合計 ${man(st.count)} 件です。</p>` : ""}
+     <table class="breakdown" style="margin-top:16px">
+       <tr><th>いちばん低い成約価格</th><td>${man(st.min)} 万円</td></tr>
+       <tr><th>いちばん高い成約価格</th><td>${man(st.max)} 万円</td></tr>
+       <tr class="total"><th>中央値</th><td>${man(st.med)} 万円</td></tr>
+     </table>
+     <p class="legend-note">
+       ${st.uncertain ? `※ ※印の物件は、町名だけでは校区が確定しません。番地により分かれますので、詳しくはお調べください。<br>` : ""}
+       ${st.noBuilt ? `※ 成約データのうち「築年月」${st.noBuilt}件は記載がなく、築年で絞る場合は集計に含まれていません。<br>` : ""}
+       ※ 出典：レインズ成約情報（2021〜2025年・富山市）</p>`);
+}
 function pageCompare(no){
   const cell = (i)=>{
     const d = P[i], p = n(d.price), r = n(d.reno);
@@ -1553,7 +1791,7 @@ function loadJsonFile(input){
 
 /* ========== 起動 ========== */
 buildPropPanel(0); buildPropPanel(1);
-bind(); render(); setMode("sim");
+bind(); render(); setMode("sim"); loadDb();
 </script>
 </body>
 </html>

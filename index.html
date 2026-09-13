@@ -284,6 +284,17 @@ body.mode-sim .page:not(.scope-sim){display:none;}
 .scope{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:var(--navy);}
 .scope select{width:auto;padding:7px 8px;font-size:14px;}
 
+/* 校区ピッカー */
+.picker{border:2px solid var(--line);border-radius:6px;max-height:210px;overflow-y:auto;margin-top:6px;background:#fff;}
+.picker label{display:flex;align-items:center;gap:8px;margin:0;padding:6px 10px;font-size:15px;
+  font-weight:600;color:var(--ink);border-bottom:1px solid #F0F3F7;cursor:pointer;}
+.picker label:hover{background:#F2F5F9;}
+.picker input{width:20px;height:20px;accent-color:#16294B;flex:0 0 20px;}
+.picker .cnt{margin-left:auto;font-size:13px;color:var(--sub);font-weight:700;}
+.picker .grp{background:#EEF1F6;color:var(--navy);font-size:13px;font-weight:800;padding:5px 10px;position:sticky;top:0;}
+.pickbar{display:flex;gap:8px;align-items:center;margin-top:8px;}
+.pickbar select{width:auto;flex:1;}
+
 /* 判定条件フォーム */
 .cond-row{display:flex;align-items:center;gap:10px;margin-top:10px;}
 .cond-row .cl{flex:1;font-size:15px;font-weight:700;color:var(--sub);}
@@ -418,8 +429,9 @@ body.mode-sim .page:not(.scope-sim){display:none;}
       <input type="number" data-k="v_bldg" placeholder="85（㎡以上）"></div>
     <div class="cond-row"><input type="checkbox" data-k="c_madori"><span class="cl">居室数</span>
       <input type="number" data-k="v_madori" placeholder="4（LDK以上）"></div>
-    <div class="cond-row"><input type="checkbox" data-k="c_school"><span class="cl">小学校区</span>
-      <input type="text" data-k="v_school" placeholder="堀川"></div>
+    <div class="cond-row"><input type="checkbox" data-k="c_school"><span class="cl">小学校区（複数選べます）</span></div>
+    <div class="pickbar"><button class="mini" onclick="S.v_school='';render()">選択をぜんぶ消す</button></div>
+    <div class="picker" id="pickCond"></div>
 
     <div class="toggle"><input type="checkbox" data-k="useSale"><span>売出中の物件一覧を載せる</span></div>
     <div class="cond-row"><input type="checkbox" data-k="listSort"><span class="cl">条件に近い順に並べる</span>
@@ -461,8 +473,10 @@ body.mode-sim .page:not(.scope-sim){display:none;}
     <div class="row">
       <div><label>種別</label><select data-k="sdKind">
         <option value="mansion">中古マンション</option><option value="kodate">中古戸建て</option></select></div>
-      <div><label>小学校区</label><select data-k="sdSchool" id="sdSchool"><option value="">指定しない</option></select></div>
     </div>
+    <label>小学校区（複数選べます）</label>
+    <div class="pickbar"><button class="mini" onclick="S.sdSchool='';render()">選択をぜんぶ消す</button></div>
+    <div class="picker" id="pickSold"></div>
     <div class="row">
       <div><label>町名（部分一致）</label><input type="text" data-k="sdTown" placeholder="天正寺"></div>
       <div><label>最寄駅</label><input type="text" data-k="sdStation" placeholder="稲荷町"></div>
@@ -724,8 +738,64 @@ function parseRows(text){
     const o = {};
     COLS.forEach((c,i)=> o[c] = cut[i] || "");
     if(cut.length > COLS.length) o.cmt = cut.slice(COLS.length-1).join(" ");
+    /* 校区が空なら町名から自動判定 */
+    if(!o.school && o.name){
+      const nm = schoolNames(o.name);
+      if(nm){ o.schools = nm; o.school = nm.length===1 ? nm[0] : nm.join("/")+"?"; }
+    } else if(o.school){
+      o.schools = [String(o.school).replace(/[?？]/g,"")].flatMap(x=>x.split("/"));
+    }
     return o;
   });
+}
+
+/* ---------- 小学校区 ---------- */
+/* 成約件数の多い順。よく使う校区を先頭に固定したいときは PINNED に書く */
+const PINNED = ["芝園","中央","柳町","西田地方","堀川","光陽","奥田","奥田北","堀川南","藤ノ木",
+  "山室","東部","新庄北","新庄","桜谷","五福","呉羽","山室中部","速星","蜷川",
+  "大沢野","大久保","広田","豊田","大広田","鵜坂","水橋学園","寒江","萩浦","草島","岩瀬"];
+/* 残りの校区の読み（五十音順に並べるため） */
+const YOMI = {朝日:"あさひ",池多:"いけだ",老田:"おいだ",大庄:"おおしょう",太田:"おおた",小見:"おみ",
+  上滝:"かみだき",熊野:"くまの",倉垣:"くらがき",神通碧:"じんずうみどり",神保:"じんぼ",新保:"しんぼ",
+  神明:"しんめい",杉原:"すぎはら",月岡:"つきおか",長岡:"ながおか",針原:"はりはら",福沢:"ふくざわ",
+  船峅:"ふなくら",古里:"ふるさと",古沢:"ふるさわ",保内:"ほない",宮野:"みやの",八尾:"やつお",
+  山田:"やまだ",八幡:"やわた",四方:"よかた"};
+
+function schoolList(){
+  const all = (DB && DB.school && DB.school.sho_list) || PINNED;
+  const pin = PINNED.filter(x=>all.includes(x));
+  const rest = all.filter(x=>!pin.includes(x))
+    .sort((a,b)=>(YOMI[a]||a).localeCompare(YOMI[b]||b,"ja"));
+  return {pin, rest};
+}
+function pickedList(key){
+  return String(S[key]||"").split(",").map(x=>x.trim()).filter(Boolean);
+}
+function togglePick(key, name, on){
+  const a = pickedList(key);
+  const i = a.indexOf(name);
+  if(on && i<0) a.push(name);
+  if(!on && i>=0) a.splice(i,1);
+  S[key] = a.join(",");
+  render();
+}
+function drawPicker(id, key){
+  const box = document.getElementById(id);
+  if(!box) return;
+  const {pin, rest} = schoolList();
+  const cur = pickedList(key);
+  const row = x => `<label><input type="checkbox" ${cur.includes(x)?"checked":""}
+      onchange="togglePick('${key}','${x}',this.checked)">${x}小学校</label>`;
+  box.innerHTML = (pin.length ? `<div class="grp">よく使う校区</div>` + pin.map(row).join("") : "")
+    + `<div class="grp">そのほか（五十音順）</div>` + rest.map(row).join("");
+}
+/* 町名から校区名（確定なら1つ、候補なら配列） */
+function schoolNames(town){
+  const r = schoolOf(town);
+  if(!r) return null;
+  if(r.confident && r.sho) return [r.sho];
+  if(r.candidates && r.candidates.length) return r.candidates;
+  return null;
 }
 
 /* ---------- 表紙の写真 ---------- */
@@ -777,11 +847,6 @@ async function loadDbFiles(input){
   }
 }
 function afterDbLoad(){
-  const sel = document.getElementById("sdSchool");
-  const list = (DB.school && DB.school.sho_list) || [];
-  sel.innerHTML = '<option value="">指定しない</option>' +
-    list.map(x=>`<option value="${esc(x)}">${esc(x)}小学校</option>`).join("");
-  sel.value = S.sdSchool || "";
   document.getElementById("dbPick").style.display = "none";
   document.getElementById("dbBox").innerHTML =
     `成約データ読み込み済み　マンション <b>${DB.sold_mansion.recs.length}</b> 件　`
@@ -792,13 +857,15 @@ function afterDbLoad(){
 const matchSchool = (r, name) =>
   (r.school_confident && r.school === name) ||
   (!r.school_confident && Array.isArray(r.school) && r.school.includes(name));
+const matchSchoolAny = (r, names) => names.some(nm => matchSchool(r, nm));
 
 function sdRecs(){ return DB ? (S.sdKind==="kodate" ? DB.sold_kodate.recs : DB.sold_mansion.recs) : []; }
 function sdFilter(recs, o){
   o = o || {};
   const g = k => (o[k]!==undefined ? o[k] : S[k]);
   return recs.filter(r=>{
-    if(g("sdSchool") && !matchSchool(r, g("sdSchool"))) return false;
+    const sl = String(g("sdSchool")||"").split(",").map(x=>x.trim()).filter(Boolean);
+    if(sl.length && !matchSchoolAny(r, sl)) return false;
     if(g("sdTown") && !String(r.town||"").includes(g("sdTown"))) return false;
     if(g("sdStation") && !String(r.station||"").includes(g("sdStation"))) return false;
     if(n(g("sdArea")) && !(r.area >= n(g("sdArea")))) return false;
@@ -829,6 +896,7 @@ function sdStats(){
     perYear: hit.length/5,
     months: hit.length ? (60/hit.length) : 0,
     uncertain: hit.filter(r=>!r.school_confident && S.sdSchool).length,
+    schools: pickedList("sdSchool"),
     min: p.length?Math.min(...p):0, max: p.length?Math.max(...p):0, med: median(p),
     noBuilt
   };
@@ -1261,8 +1329,13 @@ const CONDS = [
    use:()=>S.c_bldg && n(S.v_bldg), ok:r=>!n(r.bldg) || n(r.bldg) >= n(S.v_bldg)},
   {on:"c_madori", cell:"madori", label:()=>`${S.v_madori}LDK以上`,
    use:()=>S.c_madori && n(S.v_madori), ok:r=>!roomsOf(r.madori) || roomsOf(r.madori) >= n(S.v_madori)},
-  {on:"c_school", cell:"school", label:()=>`${S.v_school}小学校区`,
-   use:()=>S.c_school && S.v_school, ok:r=>!r.school || r.school.includes(String(S.v_school).trim())}
+  {on:"c_school", cell:"school", label:()=>pickedList("v_school").map(x=>x+"小学校").join("・")+"区",
+   use:()=>S.c_school && pickedList("v_school").length,
+   ok:r=>{
+     const want = pickedList("v_school");
+     const has = r.schools || (r.school ? [r.school] : []);
+     return !has.length || has.some(x=>want.includes(x));
+   }}
 ];
 function ngOf(r){
   const ng = {};
@@ -1461,6 +1534,9 @@ function render(){
     ご年収の基準では <b>${man(Math.round(k.income))}</b> 万円 ${k.income>0?use(k.income):""}<br>
     ご希望の返済額なら <b>${man(Math.round(k.hope))}</b> 万円 ${k.hope>0?use(k.hope):""}`
     : "家賃・年収・ご希望の返済額のどれかを入れてください";
+
+  drawPicker("pickCond","v_school");
+  drawPicker("pickSold","sdSchool");
 
   const st = sdStats();
   const sb = document.getElementById("sdBox");
@@ -1701,7 +1777,7 @@ function pageSold(no){
   if(!st) return "";
   const kind = S.sdKind==="kodate" ? "中古戸建て" : "中古マンション";
   const cond = [];
-  if(S.sdSchool) cond.push(esc(S.sdSchool)+"小学校区");
+  if(pickedList("sdSchool").length) cond.push(pickedList("sdSchool").map(x=>esc(x)+"小学校").join("・")+"区");
   if(S.sdTown) cond.push(esc(S.sdTown));
   if(S.sdStation) cond.push(esc(S.sdStation)+"駅");
   if(n(S.sdArea)) cond.push(S.sdArea+"㎡以上");
@@ -1728,7 +1804,7 @@ function pageSold(no){
   }
 
   const rows = st.sorted.slice(0,8).map(r=>{
-    const mark = (S.sdSchool && !r.school_confident) ? '<span style="color:#D0021B">※</span>' : "";
+    const mark = (pickedList("sdSchool").length && !r.school_confident) ? '<span style="color:#D0021B">※</span>' : "";
     const nm = S.sdKind==="kodate" ? esc(r.town||"") : esc(r.name || r.town || "");
     const area = S.sdKind==="kodate"
       ? `${r.land_area||"—"} / ${r.bldg_area||r.area||"—"}` : (r.area||"—");

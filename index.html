@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>案内前 提案書ビルダー ｜ ViVi不動産</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --navy:#16294B;
+  --navy-soft:#24416F;
+  --orange:#E07B1E;
+  --gold:#C08A22;
+  --ink:#23262C;
+  --sub:#5C6472;
+  --line:#D6DCE5;
+  --panel:#EEF1F6;
+  --paper:#FFFFFF;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;
+  color:var(--ink);
+  background:var(--panel);
+  font-size:17px;
+  line-height:1.7;
+}
+button{font-family:inherit;}
+
+/* ====== レイアウト ====== */
+.wrap{display:flex;align-items:flex-start;}
+.panel{
+  width:440px;flex:0 0 440px;height:100vh;overflow-y:auto;
+  background:#fff;border-right:3px solid var(--navy);padding:0 0 80px;
+  position:sticky;top:0;
+}
+.stage{flex:1;padding:28px 20px 80px;overflow-x:auto;}
+
+/* ====== 入力パネル ====== */
+.panel-head{
+  background:var(--navy);color:#fff;padding:18px 20px;position:sticky;top:0;z-index:5;
+}
+.panel-head h1{margin:0;font-size:20px;letter-spacing:.04em;}
+.panel-head p{margin:4px 0 0;font-size:14px;color:#B9C6DC;}
+.actions{display:flex;gap:8px;padding:14px 20px;border-bottom:2px solid var(--line);
+  position:sticky;top:74px;background:#fff;z-index:4;flex-wrap:wrap;}
+.btn{
+  border:2px solid var(--navy);background:var(--navy);color:#fff;
+  font-size:15px;font-weight:700;padding:10px 16px;border-radius:6px;cursor:pointer;
+}
+.btn:hover{background:var(--navy-soft);}
+.btn.ghost{background:#fff;color:var(--navy);}
+.btn.ghost:hover{background:#EEF1F6;}
+.btn.print{background:var(--orange);border-color:var(--orange);}
+.btn.print:hover{background:#C96C13;}
+.btn:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{
+  outline:3px solid var(--orange);outline-offset:2px;}
+
+fieldset{border:none;border-top:2px solid var(--line);margin:0;padding:18px 20px 22px;}
+legend{
+  font-size:17px;font-weight:800;color:var(--navy);padding:0;margin-bottom:6px;
+  border-left:6px solid var(--orange);padding-left:10px;
+}
+label{display:block;font-size:15px;font-weight:700;color:var(--sub);margin:12px 0 4px;}
+input[type=text],input[type=number],textarea,select{
+  width:100%;padding:9px 10px;font-size:16px;font-family:inherit;
+  border:2px solid var(--line);border-radius:5px;background:#fff;color:var(--ink);
+}
+textarea{min-height:76px;resize:vertical;line-height:1.6;}
+.hint{font-size:13px;color:var(--sub);margin:4px 0 0;line-height:1.5;}
+.row{display:flex;gap:10px;}
+.row>div{flex:1;}
+.calc{
+  margin-top:14px;background:#FBF4E9;border:2px solid var(--gold);border-radius:6px;
+  padding:10px 12px;font-size:15px;font-weight:700;color:var(--navy);
+}
+.calc b{font-size:21px;color:var(--orange);}
+.imgrow{display:flex;gap:8px;align-items:center;margin-top:8px;}
+.imgrow input[type=text]{flex:1;}
+.thumb{width:52px;height:40px;object-fit:cover;border:2px solid var(--line);border-radius:4px;background:#F5F5F5;}
+.mini{border:2px solid var(--line);background:#fff;color:var(--sub);border-radius:5px;
+  padding:7px 9px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.mini:hover{border-color:var(--navy);color:var(--navy);}
+
+/* ====== A4プレビュー ====== */
+.page{
+  width:210mm;min-height:297mm;background:var(--paper);margin:0 auto 26px;
+  padding:16mm 15mm;box-shadow:0 3px 14px rgba(20,30,55,.18);
+  position:relative;font-size:12.5pt;line-height:1.75;
+}
+.page-tag{
+  position:absolute;top:-22px;left:0;font-size:13px;font-weight:700;color:var(--sub);
+}
+.p-head{
+  display:flex;justify-content:space-between;align-items:baseline;
+  border-bottom:3px solid var(--navy);padding-bottom:8px;margin-bottom:20px;
+}
+.p-head h2{margin:0;font-size:20pt;color:var(--navy);letter-spacing:.04em;}
+.p-head span{font-size:11pt;color:var(--sub);}
+.foot{
+  position:absolute;left:15mm;right:15mm;bottom:10mm;
+  border-top:1px solid var(--line);padding-top:5px;
+  display:flex;justify-content:space-between;font-size:9.5pt;color:var(--sub);
+}
+
+/* 表紙 */
+.cover{display:flex;flex-direction:column;justify-content:center;text-align:center;}
+.cover .lead{font-size:13pt;color:var(--sub);letter-spacing:.3em;}
+.cover h1{font-size:30pt;color:var(--navy);margin:14px 0 0;letter-spacing:.06em;}
+.cover .cname{
+  font-size:36pt;font-weight:800;color:var(--ink);margin:44px 0 0;letter-spacing:.08em;}
+.cover .cname small{font-size:18pt;font-weight:500;margin-left:14px;}
+.cover .rule{width:120px;height:5px;background:var(--orange);margin:30px auto;}
+.cover .meta{font-size:12pt;color:var(--sub);margin-top:60px;line-height:2;}
+.cover .logo{margin-top:auto;font-size:16pt;font-weight:800;color:var(--navy);letter-spacing:.1em;}
+
+/* 本文ブロック */
+.quote{
+  font-size:17pt;font-weight:800;color:var(--navy);line-height:1.9;
+  border-left:8px solid var(--orange);padding:2px 0 2px 18px;margin:0 0 24px;
+}
+.body-text{white-space:pre-wrap;font-size:12.5pt;}
+.note-box{border:2px dashed var(--line);border-radius:6px;padding:18px 20px;margin-top:18px;}
+
+/* ご要望 */
+.need{margin-bottom:22px;}
+.need h3{
+  margin:0 0 8px;font-size:14pt;color:#fff;background:var(--navy);
+  display:inline-block;padding:5px 16px;border-radius:4px;letter-spacing:.05em;
+}
+.need ul{margin:6px 0 0;padding-left:1.4em;}
+.need li{font-size:13.5pt;margin-bottom:6px;}
+
+/* ファネル */
+.funnel{margin:10px auto 0;}
+.fstep{
+  margin:0 auto 10px;background:var(--navy);color:#fff;border-radius:6px;
+  padding:14px 10px;text-align:center;
+}
+.fstep.mid{background:var(--navy-soft);}
+.fstep.last{background:var(--orange);}
+.fstep .n{font-size:30pt;font-weight:800;line-height:1.1;}
+.fstep .n small{font-size:14pt;margin-left:3px;}
+.fstep .t{font-size:12pt;}
+.arrow{text-align:center;color:var(--sub);font-size:15pt;margin:-4px 0 6px;}
+
+/* 資金計画 */
+.money-grid{display:flex;gap:12px;margin-bottom:16px;}
+.money{
+  flex:1;border:3px solid var(--navy);border-radius:8px;padding:14px 10px;text-align:center;
+}
+.money .lbl{font-size:11pt;color:var(--sub);font-weight:700;}
+.money .val{font-size:26pt;font-weight:800;color:var(--navy);line-height:1.2;}
+.money .val small{font-size:13pt;margin-left:2px;}
+.money.hi{border-color:var(--orange);background:#FDF3E7;}
+.money.hi .val{color:var(--orange);}
+.breakdown{width:100%;border-collapse:collapse;margin-top:6px;}
+.breakdown th,.breakdown td{border:1px solid var(--line);padding:9px 12px;font-size:12.5pt;}
+.breakdown th{background:#F2F5F9;color:var(--navy);text-align:left;width:45%;}
+.breakdown td{text-align:right;font-weight:700;}
+.breakdown tr.total th{background:var(--navy);color:#fff;}
+.breakdown tr.total td{background:#FDF3E7;color:var(--orange);font-size:18pt;font-weight:800;}
+
+/* 物件カード */
+.spec{width:100%;border-collapse:collapse;margin-top:4px;}
+.spec th,.spec td{border:1px solid var(--line);padding:7px 10px;font-size:12pt;}
+.spec th{background:#F2F5F9;color:var(--navy);text-align:left;white-space:nowrap;}
+.price-bar{
+  display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;
+  background:var(--navy);color:#fff;border-radius:6px;padding:12px 18px;margin-bottom:14px;
+}
+.price-bar .addr{font-size:13pt;font-weight:700;}
+.price-bar .p{margin-left:auto;font-size:26pt;font-weight:800;color:#FFC77A;}
+.price-bar .p small{font-size:13pt;}
+.imggrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
+.imgcell{border:1px solid var(--line);border-radius:5px;overflow:hidden;background:#F7F8FA;}
+.imgcell img{width:100%;height:62mm;object-fit:contain;display:block;background:#fff;}
+.imgcell .cap{font-size:11pt;padding:5px 8px;color:var(--navy);font-weight:700;border-top:1px solid var(--line);}
+.placeholder{
+  height:62mm;display:flex;align-items:center;justify-content:center;
+  color:#9AA4B2;font-size:11pt;text-align:center;padding:10px;}
+
+/* 比較表 */
+.cmp{width:100%;border-collapse:collapse;margin-top:4px;table-layout:fixed;}
+.cmp th,.cmp td{border:2px solid #fff;padding:12px;vertical-align:top;font-size:12pt;}
+.cmp thead th{color:#fff;font-size:13pt;text-align:center;}
+.cmp thead th.c0{background:#fff;border:none;}
+.cmp thead th.c1{background:#2E8A8A;}
+.cmp thead th.c2{background:var(--orange);}
+.cmp thead th.c3{background:var(--navy-soft);}
+.cmp tbody th{background:#F2F5F9;color:var(--navy);text-align:center;width:78px;font-size:12pt;}
+.cmp td.c1{background:#E4F1F1;}
+.cmp td.c2{background:#FDF0E2;}
+.cmp td.c3{background:#EDF1F8;}
+.cmp ul{margin:0;padding-left:1.2em;}
+.cmp li{margin-bottom:5px;}
+.cmp .kv{display:flex;justify-content:space-between;border-bottom:1px dotted #A9B6BE;padding:3px 0;}
+.cmp .kv b{color:var(--navy);}
+
+.empty{color:#9AA4B2;font-size:12pt;}
+
+/* 事例一覧 */
+.list{width:100%;border-collapse:collapse;margin-top:10px;font-size:10.5pt;}
+.list th,.list td{border:1px solid var(--line);padding:6px 5px;text-align:center;}
+.list thead th{background:var(--navy);color:#fff;font-weight:700;}
+.list td.name{text-align:left;white-space:nowrap;}
+.list td.cmt{text-align:left;font-size:10pt;color:var(--sub);}
+.list .ng{color:#D0021B;font-weight:800;}
+.list .ng s{text-decoration:line-through;}
+.list td.j{font-size:15pt;font-weight:800;}
+.j-o{color:#1F7A5A;} .j-t{color:var(--gold);} .j-x{color:#D0021B;}
+.list tr.row-x td{background:#FFF4F4;}
+.list .sub{display:block;font-size:9pt;color:var(--sub);}
+.legend-note{font-size:10.5pt;color:var(--sub);margin-top:10px;line-height:1.6;}
+.cond-strip{
+  background:#F2F5F9;border:1px solid var(--line);border-radius:5px;
+  padding:8px 12px;font-size:10.5pt;color:var(--navy);margin-bottom:6px;}
+
+/* 判定条件フォーム */
+.cond-row{display:flex;align-items:center;gap:10px;margin-top:10px;}
+.cond-row .cl{flex:1;font-size:15px;font-weight:700;color:var(--sub);}
+.cond-row input[type=checkbox]{width:22px;height:22px;flex:0 0 22px;accent-color:#16294B;}
+.cond-row input[type=number],.cond-row input[type=text],.cond-row select{width:150px;flex:0 0 150px;}
+.toggle{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:15px;font-weight:700;color:var(--navy);}
+.toggle input{width:22px;height:22px;accent-color:#16294B;}
+
+/* ====== 印刷 ====== */
+@media print{
+  @page{size:A4 portrait;margin:0;}
+  body{background:#fff;font-size:12pt;}
+  .panel,.page-tag,.stage-note{display:none !important;}
+  .wrap{display:block;}
+  .stage{padding:0;}
+  .page{
+    width:210mm;min-height:297mm;margin:0;box-shadow:none;
+    page-break-after:always;break-after:page;
+  }
+  .page:last-child{page-break-after:auto;}
+}
+@media (max-width:1100px){
+  .wrap{display:block;}
+  .panel{width:100%;flex:none;height:auto;position:static;border-right:none;border-bottom:3px solid var(--navy);}
+  .actions{top:0;}
+  .page{width:100%;min-height:0;padding:22px;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ============ 入力パネル ============ -->
+<div class="panel">
+  <div class="panel-head">
+    <h1>案内前 提案書ビルダー</h1>
+    <p>入力すると右のA4提案書がその場で出来上がります</p>
+  </div>
+
+  <div class="actions">
+    <button class="btn print" onclick="window.print()">印刷・PDF保存</button>
+    <button class="btn ghost" onclick="saveJson()">入力を保存</button>
+    <button class="btn ghost" onclick="document.getElementById('loadJson').click()">保存を読み込む</button>
+    <input type="file" id="loadJson" accept=".json" style="display:none" onchange="loadJsonFile(this)">
+  </div>
+
+  <fieldset>
+    <legend>1. 基本情報</legend>
+    <p class="hint">最初の面談で使った資金計画シミュレーションのエクセルを読み込むと、お名前と資金計画がまとめて入ります。</p>
+    <button class="btn" onclick="document.getElementById('xlsFile').click()">資金計画エクセルを読み込む</button>
+    <input type="file" id="xlsFile" accept=".xlsx,.xlsm" style="display:none" onchange="readXls(this)">
+    <div class="calc" id="xlsBox">まだ読み込んでいません</div>
+
+    <label>お客様のお名前</label>
+    <input type="text" data-k="customer" placeholder="藤井　宏輔・愛理">
+    <div class="row">
+      <div><label>ご提案日</label><input type="text" data-k="date" placeholder="2026年9月13日"></div>
+      <div><label>担当者</label><input type="text" data-k="staff" placeholder="矢郷　修治"></div>
+    </div>
+    <label>会社名</label>
+    <input type="text" data-k="company" placeholder="ViVi不動産株式会社">
+  </fieldset>
+
+  <fieldset>
+    <legend>2. ご要望（優先順位）</legend>
+    <p class="hint">Zoho CRMのヒアリング欄からコピーして貼り付け。1行＝1項目になります。</p>
+    <label>優先順位① 見出し</label>
+    <input type="text" data-k="need1t" placeholder="エリア">
+    <label>優先順位① 内容</label>
+    <textarea data-k="need1" placeholder="富山地鉄本線 稲荷町駅から徒歩15分&#10;閑静な住宅地　大通りは避けたい&#10;小学校から遠すぎない（〜15分）"></textarea>
+    <label>優先順位② 見出し</label>
+    <input type="text" data-k="need2t" placeholder="物件条件">
+    <label>優先順位② 内容</label>
+    <textarea data-k="need2" placeholder="内装は自分たちで決めたい&#10;30坪以内で4LDKが理想"></textarea>
+    <label>優先順位③ 見出し</label>
+    <input type="text" data-k="need3t" placeholder="外部・駐車">
+    <label>優先順位③ 内容</label>
+    <textarea data-k="need3" placeholder="駐車2台可能"></textarea>
+    <label>担当者からのメッセージ</label>
+    <textarea data-k="msg" placeholder="ご要望を一つでも多く叶えられるよう、心を込めて作成いたしました。"></textarea>
+  </fieldset>
+
+  <fieldset>
+    <legend>3. 絞り込みの経過</legend>
+    <p class="hint">ファネルチャートの数字をそのまま入れてください。</p>
+    <div class="row">
+      <div><label>エリア内の総件数</label><input type="number" data-k="f1" placeholder="538"></div>
+      <div><label>条件に合う件数</label><input type="number" data-k="f2" placeholder="21"></div>
+      <div><label>ご内覧件数</label><input type="number" data-k="f3" placeholder="2"></div>
+    </div>
+    <label>絞り込みの説明</label>
+    <textarea data-k="ftext" placeholder="オーナーチェンジ物件などを省き、間取りや周辺環境をご要望と照らし合わせて、一緒に取捨選択しました。"></textarea>
+  </fieldset>
+
+  <fieldset>
+    <legend>4. 事例一覧と判定条件</legend>
+    <p class="hint">チェックを入れた条件だけで判定します。お客様ごとに変えてください。</p>
+
+    <div class="cond-row"><input type="checkbox" data-k="c_budget"><span class="cl">予算の上限</span>
+      <input type="number" data-k="v_budget" placeholder="3000（万円）"></div>
+    <div class="cond-row"><input type="checkbox" data-k="c_walk"><span class="cl">駅から徒歩</span>
+      <input type="number" data-k="v_walk" placeholder="15（分以内）"></div>
+    <div class="cond-row"><input type="checkbox" data-k="c_age"><span class="cl">築年数</span>
+      <input type="number" data-k="v_age" placeholder="25（年以内）"></div>
+    <div class="cond-row"><input type="checkbox" data-k="c_quake"><span class="cl">耐震基準</span>
+      <select data-k="v_quake">
+        <option value="new">新耐震のみ（昭和57年以降）</option>
+        <option value="old">旧耐震も可（昭和56年以前）</option>
+      </select></div>
+    <div class="cond-row"><input type="checkbox" data-k="c_land"><span class="cl">土地面積</span>
+      <input type="number" data-k="v_land" placeholder="100（㎡以上）"></div>
+    <div class="cond-row"><input type="checkbox" data-k="c_bldg"><span class="cl">建物面積</span>
+      <input type="number" data-k="v_bldg" placeholder="85（㎡以上）"></div>
+    <div class="cond-row"><input type="checkbox" data-k="c_madori"><span class="cl">居室数</span>
+      <input type="number" data-k="v_madori" placeholder="4（LDK以上）"></div>
+    <div class="cond-row"><input type="checkbox" data-k="c_school"><span class="cl">小学校区</span>
+      <input type="text" data-k="v_school" placeholder="堀川"></div>
+
+    <div class="toggle"><input type="checkbox" data-k="useSale"><span>売出中の物件一覧を載せる</span></div>
+
+    <label>レインズのPDFから読み込む</label>
+    <p class="hint">検索結果を印刷保存したPDFを選んでください。50件ずつに分かれていても、<b>まとめて複数選べます</b>。同じ物件は自動でまとめます。</p>
+    <div class="cond-row"><input type="checkbox" data-k="excOC"><span class="cl">オーナーチェンジを除く</span></div>
+    <div class="cond-row"><input type="checkbox" data-k="excMoushi"><span class="cl">申込ありを除く</span></div>
+    <button class="btn ghost" onclick="document.getElementById('reinsSale').click()">売出PDFを読み込む</button>
+    <button class="btn ghost" onclick="document.getElementById('reinsSold').click()">成約PDFを読み込む</button>
+    <input type="file" id="reinsSale" accept="application/pdf" multiple style="display:none" onchange="readReins(this,'saleData')">
+    <input type="file" id="reinsSold" accept="application/pdf" multiple style="display:none" onchange="readReins(this,'soldData')">
+    <div class="calc" id="reinsBox">まだ読み込んでいません</div>
+
+    <label>売出中の物件（貼り付け・修正）</label>
+    <p class="hint">PDFを読み込むとここに入ります。行を消す、備考を書く、判定を上書きする、はこの欄で。<br>
+      列の順番は <b>町名 → 建物名 → 価格 → 土地㎡ → 建物㎡ → 築年 → 徒歩分 → 間取り → 校区 → 備考</b></p>
+    <textarea data-k="saleData" style="min-height:150px"></textarea>
+
+    <div class="toggle"><input type="checkbox" data-k="useSold"><span>成約事例を載せる</span></div>
+    <label>成約事例（貼り付け・修正）</label>
+    <textarea data-k="soldData" style="min-height:120px"></textarea>
+
+    <label>判定の手動修正</label>
+    <p class="hint">自動判定を変えたい行は、コメントの先頭に ○ △ ✕ のどれかを書くと、その記号が優先されます。</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>5. 資金計画</legend>
+    <div class="row">
+      <div><label>借入総額（万円）</label><input type="number" data-k="loan" placeholder="4000"></div>
+      <div><label>自己資金（万円）</label><input type="number" data-k="own" placeholder="200"></div>
+    </div>
+    <div class="row">
+      <div><label>月々返済（万円）</label><input type="number" step="0.1" data-k="month" placeholder="11.5"></div>
+      <div><label>ボーナス返済（万円／回）</label><input type="number" step="0.1" data-k="bonus" placeholder="0"></div>
+    </div>
+    <div class="row">
+      <div><label>金利（％）</label><input type="number" step="0.01" data-k="rate" placeholder="0.97"></div>
+      <div><label>返済期間（年）</label><input type="number" data-k="years" placeholder="35"></div>
+    </div>
+    <div class="row">
+      <div><label>諸費用（万円）</label><input type="number" data-k="fee" placeholder="400"></div>
+      <div><label>返済負担率（％）</label><input type="number" step="0.1" data-k="ratio" placeholder="19"></div>
+    </div>
+    <div class="calc" id="calcBox">資金総額 <b>—</b></div>
+    <p class="hint">物件価格とリノベ費用は下の物件①の欄から自動で計算します。</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>6. 借入可能額の試算</legend>
+    <p class="hint">初回面談用。3つの基準で計算します。使う額の「これを使う」を押すと、上の資金計画に入ります。</p>
+    <div class="row">
+      <div><label>家賃（万円／月）</label><input type="number" step="0.1" data-k="sim_rent"></div>
+      <div><label>共益費など</label><input type="number" step="0.1" data-k="sim_kyoueki"></div>
+      <div><label>駐車場など</label><input type="number" step="0.1" data-k="sim_park"></div>
+    </div>
+    <div class="row">
+      <div><label>ご年収（万円）</label><input type="number" data-k="sim_income"></div>
+      <div><label>ご家族の収入</label><input type="number" data-k="sim_income2"></div>
+    </div>
+    <div class="row">
+      <div><label>審査上の負担率（％）</label><input type="number" step="0.1" data-k="sim_ratio"></div>
+      <div><label>既存借入（万円／年）</label><input type="number" step="0.1" data-k="sim_exist"></div>
+      <div><label>審査金利（％）</label><input type="number" step="0.01" data-k="sim_shinsa"></div>
+    </div>
+    <p class="hint">希望返済額の基準には、上の資金計画に入れた月々返済・ボーナス・金利・期間を使います。</p>
+    <div class="calc" id="simBox1">—</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>7. 今買う場合と先に延ばした場合</legend>
+    <p class="hint">購入資金の総額は、上の資金計画の「借入総額＋自己資金」を使います。</p>
+    <div class="row">
+      <div><label>現在のご年齢</label><input type="number" data-k="sim_age"></div>
+      <div><label>何年後に購入</label><input type="number" data-k="sim_after"></div>
+    </div>
+    <div class="row">
+      <div><label>毎月の積立（万円）</label><input type="number" step="0.1" data-k="sim_tsumi"></div>
+      <div><label>購入までの家賃（万円／月）</label><input type="number" step="0.1" data-k="sim_rent2"></div>
+    </div>
+    <div class="row">
+      <div><label>将来の金利（％）</label><input type="number" step="0.01" data-k="sim_rate_f"></div>
+      <div><label>将来の返済期間（年）</label><input type="number" data-k="sim_years_f"></div>
+      <div><label>物件価格の上昇率（％）</label><input type="number" step="0.01" data-k="sim_up"></div>
+    </div>
+    <div class="calc" id="simBox2">—</div>
+    <button class="btn" onclick="applySim()">この結果を提案書に反映する</button>
+  </fieldset>
+
+  <fieldset>
+    <legend>8. 物件①</legend>
+    <div id="prop1"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>9. 物件②</legend>
+    <div id="prop2"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>10. 固定ページの文章</legend>
+    <p class="hint">一度書けば毎回そのまま使えます。保存ボタンで残しておいてください。</p>
+    <label>ごあいさつ 見出し</label>
+    <input type="text" data-k="greetTitle" placeholder="家に暮らしを合わせるのではなく、暮らしに家を合わせる。">
+    <label>ごあいさつ 本文</label>
+    <textarea data-k="greetBody" style="min-height:150px"></textarea>
+    <label>考え方のページ 見出し</label>
+    <input type="text" data-k="mindTitle" placeholder="100％満足する物件は存在しません">
+    <label>考え方のページ 本文</label>
+    <textarea data-k="mindBody" style="min-height:150px"></textarea>
+    <label>プロとしてお伝えしたいこと 見出し</label>
+    <input type="text" data-k="proTitle" placeholder="決断までのスピードが大事です">
+    <label>プロとしてお伝えしたいこと 本文</label>
+    <textarea data-k="proBody" style="min-height:150px"></textarea>
+  </fieldset>
+</div>
+
+<!-- ============ プレビュー ============ -->
+<div class="stage" id="stage"></div>
+</div>
+
+<script>
+/* ========== 状態 ========== */
+const defaults = {
+  customer:"", date:"", staff:"", company:"ViVi不動産株式会社",
+  need1t:"エリア", need1:"", need2t:"物件条件", need2:"", need3t:"外部・駐車", need3:"",
+  msg:"お客様のご要望を一つでも多く叶えられるよう、心を込めてこの提案書を作成させていただきました。",
+  f1:"", f2:"", f3:"", ftext:"オーナーチェンジ物件などを省き、間取りや周辺環境などお客様のこだわりの条件と照らし合わせ、一緒に取捨選択をして厳選いたしました。",
+  loan:"", own:"", month:"", bonus:"", rate:"", years:"35", fee:"", ratio:"",
+  c_budget:true, v_budget:"", c_walk:false, v_walk:"", c_age:false, v_age:"",
+  c_quake:true, v_quake:"new", c_land:false, v_land:"", c_bldg:false, v_bldg:"",
+  c_madori:false, v_madori:"", c_school:false, v_school:"",
+  useSale:true, saleData:"", useSold:false, soldData:"", excOC:true, excMoushi:false,
+  income:"", lp_now:"", lp_future:"", lp_zansai:"", lp_zansai_f:"", lp_diff:"", lp_day:"", lp_after:"",
+  sim_rent:"", sim_kyoueki:"", sim_park:"", sim_income:"", sim_income2:"", sim_ratio:"35",
+  sim_exist:"", sim_shinsa:"3", sim_age:"", sim_after:"3", sim_tsumi:"", sim_rent2:"",
+  sim_rate_f:"", sim_years_f:"35", sim_up:"0",
+  greetTitle:"家に暮らしを合わせるのではなく、暮らしに家を合わせる。",
+  greetBody:"このたびは、弊社にご相談いただき誠にありがとうございます。\n\n私たちが物件をご紹介したり、リノベーションをご提案する際に一番大切にしていることは、お客様の暮らし方です。\n\nお子様とどう関わっているのか。ご家族で大切にしている時間は何か。5年後、10年後、どんな暮らしが理想か。\n\n暮らし方は千差万別です。だからこそ、しっかり想いを共有することが大切だと考えています。おしゃれな雰囲気だけど、なんだか暮らしにくい。そうなってしまっては元も子もありません。\n\n私たちの仕事は、まず話を聴くところから始まります。見つけたヒントを住まいを通してカタチにしていくことが、私たちの仕事です。",
+  mindTitle:"100％満足する物件は存在しません",
+  mindBody:"物件の価格はそれ相応に決まっており、掘り出し物件は滅多にありません。大切なことは、物件に対しての優先順位をはっきりさせることです。\n\nこれまで多くの方のマイホーム購入をお手伝いしてきましたが、すべての要素に100％満足された方はほとんどいらっしゃいません。\n\n優先項目のほとんどを満たす物件があったとしても、それだけ希望にかなう物件は価格面での満足感が得られないケースが多くあります。限られた予算の中で、できる限り希望条件に近い物件を探していくことになります。\n\nその場合、総合的に7〜8割満足されたら買い時だと判断されることをおすすめします。",
+  proTitle:"決断までのスピードが大事です",
+  proBody:"不動産という商品は一物一価、どれ一つとして同じものはありません。一つの物件を複数の方で取り合うという場面にもよく遭遇します。\n\nそのため、気に入った物件があれば資金計画を改めて確認し、計画にご無理がなければ、できる限り早く決断し購入申込をされることをおすすめします。\n\n100％満足する物件を求めて悩んでいる間に、別の方にその物件を押さえられてしまうことがよく起こります。そうなると、時間を割いてようやくゴールが見えてきたのに、また振り出しに戻ってしまいます。\n\nたくさん見て迷子にならないために、住まいの購入動機をときどき思い出してください。後悔しない住まいを手に入れるために、いちばん大切なことです。"
+};
+const propFields = [
+  {k:"addr", l:"所在地", ph:"富山市天正寺〇〇番地"},
+  {k:"price", l:"物件価格（万円）", t:"number", ph:"2680"},
+  {k:"reno", l:"リノベ概算（万円）", t:"number", ph:"1200"},
+  {k:"access", l:"交通", ph:"富山地鉄本線 稲荷町駅 徒歩12分"},
+  {k:"land", l:"土地面積", ph:"103.44㎡（31.29坪）"},
+  {k:"bldg", l:"建物面積", ph:"86.26㎡（26.09坪）"},
+  {k:"built", l:"築年月", ph:"2003年3月（築22年）"},
+  {k:"plan", l:"間取り", ph:"4LDK"},
+  {k:"floor", l:"構造・階数", ph:"木造 2階建"},
+  {k:"road", l:"前面道路", ph:"南5m・東9m　角地"},
+  {k:"school", l:"小学校・中学校", ph:"〇〇小学校 徒歩10分／〇〇中学校 徒歩11分"},
+  {k:"life", l:"周辺施設", ph:"スーパー450m／コンビニ450m／ドラッグストア500m"},
+  {k:"merit", l:"メリット（1行1つ）", t:"area", ph:"人気の角地物件\n各居室2面採光\n南向きで陽当たり良好\nこだわりリノベが可能"},
+  {k:"demerit", l:"気になる点（1行1つ）", t:"area", ph:"駐車が少し入れにくい\n和室の設備が古い"}
+];
+let S = Object.assign({}, defaults);
+let P = [blankProp(), blankProp()];
+function blankProp(){ const o={imgs:[]}; propFields.forEach(f=>o[f.k]=""); return o; }
+
+/* ========== 入力パネル生成 ========== */
+function buildPropPanel(i){
+  const box = document.getElementById("prop"+(i+1));
+  let h = "";
+  propFields.forEach(f=>{
+    h += `<label>${f.l}</label>`;
+    h += f.t==="area"
+      ? `<textarea data-p="${i}" data-k="${f.k}" placeholder="${f.ph}"></textarea>`
+      : `<input type="${f.t||"text"}" data-p="${i}" data-k="${f.k}" placeholder="${f.ph}">`;
+  });
+  h += `<label>画像（外観・間取り・地図・周辺情報）</label>
+    <p class="hint">スクリーンショットをそのまま追加できます。追加した順に「周辺情報」ページへ並びます。</p>
+    <button class="mini" onclick="pickImg(${i})">画像を追加</button>
+    <input type="file" id="file${i}" accept="image/*" multiple style="display:none" onchange="addImgs(${i},this)">
+    <div id="imgs${i}"></div>`;
+  box.innerHTML = h;
+}
+function renderImgList(i){
+  const box = document.getElementById("imgs"+i);
+  box.innerHTML = P[i].imgs.map((im,j)=>`
+    <div class="imgrow">
+      <img class="thumb" src="${im.src}" alt="">
+      <input type="text" value="${esc(im.cap)}" oninput="P[${i}].imgs[${j}].cap=this.value;render()" placeholder="説明（例：駅までの徒歩ルート）">
+      <button class="mini" onclick="P[${i}].imgs.splice(${j},1);renderImgList(${i});render()">削除</button>
+    </div>`).join("");
+}
+function pickImg(i){ document.getElementById("file"+i).click(); }
+function addImgs(i, input){
+  const files = [...input.files];
+  let done = 0;
+  files.forEach(f=>{
+    const r = new FileReader();
+    r.onload = e=>{
+      P[i].imgs.push({src:e.target.result, cap:""});
+      if(++done===files.length){ renderImgList(i); render(); }
+    };
+    r.readAsDataURL(f);
+  });
+  input.value = "";
+}
+
+/* ========== 入力バインド ========== */
+function bind(){
+  document.querySelectorAll("[data-k]").forEach(el=>{
+    const p = el.dataset.p, k = el.dataset.k, cb = el.type==="checkbox";
+    if(p===undefined){ if(S[k]!==undefined){ cb ? el.checked = !!S[k] : el.value = S[k]; } }
+    else el.value = P[+p][k] || "";
+    el.addEventListener(cb?"change":"input", ()=>{
+      if(p===undefined) S[k] = cb ? el.checked : el.value;
+      else P[+p][k] = el.value;
+      render();
+    });
+  });
+}
+
+/* ========== ユーティリティ ========== */
+function esc(s){ return (s==null?"":String(s)).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function n(v){ const x = parseFloat(v); return isNaN(x)?0:x; }
+function man(v){ const x = n(v); return x? x.toLocaleString("ja-JP") : "—"; }
+function lines(s){ return (s||"").split("\n").map(t=>t.trim()).filter(Boolean); }
+function ul(s){ const a = lines(s); return a.length? `<ul>${a.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>` : `<p class="empty">未入力</p>`; }
+
+/* ========== 事例一覧の解析と判定 ========== */
+const THIS_YEAR = new Date().getFullYear();
+const COLS = ["name","bname","price","land","bldg","built","walk","madori","school","cmt"];
+
+function parseRows(text){
+  return lines(text).map(line=>{
+    let cut;
+    if(line.includes("\t")) cut = line.split("\t").map(s=>s.trim());
+    else cut = line.split(/\s{2,}|,|、|　/).map(s=>s.trim()).filter(s=>s!=="");
+    const o = {};
+    COLS.forEach((c,i)=> o[c] = cut[i] || "");
+    if(cut.length > COLS.length) o.cmt = cut.slice(COLS.length-1).join(" ");
+    return o;
+  });
+}
+
+function syncInputs(){
+  document.querySelectorAll("[data-k]").forEach(el=>{
+    const k = el.dataset.k;
+    if(el.dataset.p!==undefined) return;
+    if(el.type==="checkbox") el.checked = !!S[k];
+    else if(S[k]!==undefined) el.value = S[k];
+  });
+}
+/* ---------- ローン計算 ---------- */
+/* 毎月返済額から借りられる元金 */
+function pv(ratePct, years, pmt){
+  const r = ratePct/12/100, n = years*12;
+  if(!(n>0) || !(pmt>0)) return 0;
+  return r===0 ? pmt*n : pmt*(1-Math.pow(1+r,-n))/r;
+}
+/* 元金から毎月返済額 */
+function pmt(ratePct, years, principal){
+  const r = ratePct/12/100, n = years*12;
+  if(!(n>0) || !(principal>0)) return 0;
+  return r===0 ? principal/n : principal*r/(1-Math.pow(1+r,-n));
+}
+/* m か月経過時点の残元金 */
+function balance(principal, ratePct, years, months){
+  const r = ratePct/12/100, n = years*12;
+  const m = Math.max(0, Math.min(months, n));
+  if(!(n>0) || !(principal>0)) return 0;
+  if(r===0) return principal*(1-m/n);
+  const a = Math.pow(1+r,n), b = Math.pow(1+r,m);
+  return principal*(a-b)/(a-1);
+}
+function simKariire(){
+  const yrs = n(S.years)||35;
+  const kachin = n(S.sim_rent)+n(S.sim_kyoueki)+n(S.sim_park);
+  const nenshu = ((n(S.sim_income)+n(S.sim_income2))/12)*(n(S.sim_ratio)/100) - n(S.sim_exist)/12;
+  return {
+    rent:   pv(n(S.rate), yrs, kachin),
+    income: pv(n(S.sim_shinsa), yrs, nenshu),
+    hope:   pv(n(S.rate), yrs, n(S.month)+n(S.bonus)/12)
+  };
+}
+function simHikaku(){
+  const age = n(S.sim_age), after = n(S.sim_after);
+  const total = n(S.loan)+n(S.own);
+  if(!age || !total) return null;
+  const r0 = n(S.rate), y0 = n(S.years)||35;
+  const rf = n(S.sim_rate_f)||r0, yf = n(S.sim_years_f)||y0;
+
+  const p0 = Math.max(0, total - n(S.own));
+  const now = {
+    pay: pmt(r0, y0, p0)*y0*12,
+    jiko: n(S.own),
+    zansai: balance(p0, r0, y0, (65-age)*12)
+  };
+  now.sum = now.pay + now.jiko;
+
+  const tsumi = n(S.sim_tsumi)*12*after;
+  const yachin = n(S.sim_rent2)*12*after;
+  const up = total*(n(S.sim_up)/100);
+  const pf = Math.max(0, total + up - n(S.own) - tsumi);
+  const fut = {
+    pay: pmt(rf, yf, pf)*yf*12,
+    jiko: n(S.own)+tsumi,
+    yachin: yachin,
+    zansai: balance(pf, rf, yf, (65-age-after)*12)
+  };
+  fut.sum = fut.pay + fut.jiko + fut.yachin;
+
+  const diff = fut.sum - now.sum;
+  return {now, fut, diff, day: after? diff/(after*365)*10000 : 0, after};
+}
+function applySim(){
+  const h = simHikaku();
+  if(!h){ alert("現在のご年齢と、上の資金計画（借入総額）を入れてください。"); return; }
+  S.lp_after = String(h.after);
+  S.lp_now = String(Math.round(h.now.sum));
+  S.lp_future = String(Math.round(h.fut.sum));
+  S.lp_zansai = String(Math.round(h.now.zansai));
+  S.lp_zansai_f = String(Math.round(h.fut.zansai));
+  S.lp_diff = String(Math.round(h.diff));
+  S.lp_day = String(Math.round(h.day));
+  render();
+}
+
+function sheetOf(wb, key){
+  const nm = wb.SheetNames.find(s=>s.replace(/\s/g,"").includes(key));
+  return nm ? wb.Sheets[nm] : null;
+}
+function cv(ws, addr){
+  if(!ws || !ws[addr]) return null;
+  const v = ws[addr].v;
+  return (v===undefined || v==="") ? null : v;
+}
+function rnd(v, d){
+  if(v===null || v==="" || isNaN(v)) return "";
+  const p = Math.pow(10, d||0);
+  return String(Math.round(v*p)/p);
+}
+/* 「お客様名」と書かれたセルの右隣を探す */
+function nameInSheet(ws){
+  if(!ws) return "";
+  for(const a in ws){
+    if(a[0]==="!" || !ws[a] || typeof ws[a].v !== "string") continue;
+    if(/お客様名|顧客名|お名前|氏名/.test(ws[a].v)){
+      const m = a.match(/^([A-Z]+)(\d+)$/); if(!m) continue;
+      for(let step=1; step<=3; step++){
+        const col = String.fromCharCode(m[1].charCodeAt(m[1].length-1)+step);
+        const nx = m[1].slice(0,-1) + col + m[2];
+        if(ws[nx] && typeof ws[nx].v === "string" && ws[nx].v.trim()) return ws[nx].v.trim();
+      }
+    }
+  }
+  return "";
+}
+function nameFromFile(fn){
+  return fn.replace(/\.(xlsx|xlsm)$/i,"")
+           .split(/[_\-　 ]/)[0]
+           .replace(/(様|さま|さん)$/,"")
+           .replace(/^(新|旧|コピー)/,"").trim();
+}
+async function readXls(input){
+  const f = input.files[0]; input.value = "";
+  if(!f) return;
+  const box = document.getElementById("xlsBox");
+  box.textContent = "読み込んでいます…";
+  try{
+    const wb = XLSX.read(await f.arrayBuffer(), {type:"array"});
+    const kanou = sheetOf(wb, "物件購入可能額");
+    const imasugu = sheetOf(wb, "今すぐ");
+    if(!kanou && !imasugu){
+      box.textContent = "シートが見つかりません。「物件購入可能額」があるファイルを選んでください。";
+      return;
+    }
+    if(kanou){
+      const set = (k, v) => { if(v!=="") S[k] = v; };
+      set("loan",  rnd(cv(kanou,"T30"), 0));
+      set("month", rnd(cv(kanou,"N6"), 1));
+      set("bonus", rnd(cv(kanou,"N8"), 1));
+      set("rate",  rnd(cv(kanou,"N14"), 2));
+      set("years", rnd(cv(kanou,"N16"), 0));
+      set("ratio", rnd(cv(kanou,"N10"), 1));
+      const inc = cv(kanou,"I6"), inc2 = cv(kanou,"I8");
+      if(inc!==null) S.income = rnd(n(inc)+n(inc2||0), 0);
+    }
+    if(imasugu){
+      S.own         = rnd(cv(imasugu,"F10"), 0);
+      S.lp_after    = rnd(cv(imasugu,"K6"), 0);
+      S.lp_now      = rnd(cv(imasugu,"F29"), 0);
+      S.lp_future   = rnd(cv(imasugu,"J29"), 0);
+      S.lp_zansai   = rnd(cv(imasugu,"F32"), 0);
+      S.lp_zansai_f = rnd(cv(imasugu,"J32"), 0);
+      S.lp_diff     = rnd(cv(imasugu,"I35"), 0);
+      S.lp_day      = rnd(cv(imasugu,"F37"), 0);
+    }
+    const inCell = nameInSheet(kanou) || nameInSheet(imasugu);
+    const nm = inCell || nameFromFile(f.name);
+    if(nm && !S.customer) S.customer = nm;
+
+    syncInputs();
+    render();
+
+    box.innerHTML = `お名前 <b>${esc(S.customer||"—")}</b>　借入 <b>${man(S.loan)}</b> 万円　月々 <b>${S.month||"—"}</b> 万円`
+      + (S.lp_zansai!=="" ? `<br>65歳残債 <b>${man(S.lp_zansai)}</b> 万円　／　${S.lp_after||"—"}年後との差 <b>${man(S.lp_diff)}</b> 万円` : "")
+      + (inCell ? "" : "<br>お名前はファイル名から取りました。違う場合は下の欄で直してください。");
+  }catch(e){
+    box.textContent = "読み込めませんでした：" + e.message;
+  }
+}
+
+/* ---------- レインズPDFの読み取り ---------- */
+/* pdf.jsは文字を1つずつ返すので、座標から行を組み直す */
+function pageText(items){
+  const rows = {};
+  items.forEach(it=>{
+    if(!it.str.trim()) return;
+    const y = Math.round(it.transform[5]);
+    const key = Object.keys(rows).find(k=>Math.abs(k-y)<=2) || y;
+    (rows[key] = rows[key] || []).push({x: it.transform[4], w: it.width||0, s: it.str});
+  });
+  return Object.keys(rows).sort((a,b)=>b-a).map(k=>{
+    const line = rows[k].sort((a,b)=>a.x-b.x);
+    let out = "", end = null;
+    line.forEach(c=>{
+      if(end!==null && c.x - end > 2.5) out += " ";
+      out += c.s; end = c.x + c.w;
+    });
+    return out;
+  }).join("\n");
+}
+function normalize(t){ return t.normalize("NFKC").replace(/\s+/g," "); }
+function townOf(full){
+  return full.replace(/^.+?[都道府県]/,"")
+             .replace(/^.+?[市区]/,"")
+             .replace(/^.+?郡.+?[町村]/,"");
+}
+function parseReinsText(raw){
+  const t = normalize(raw);
+  let total = 0;
+  const mt = t.match(/[∕／\/]\s*([\d,]+)\s*件/);
+  if(mt) total = n(mt[1].replace(/,/g,""));
+
+  const hits = [...t.matchAll(/(?:^|\s)(\d{12})(?=\s)/g)];
+  const rows = [];
+  hits.forEach((h,i)=>{
+    const c = t.slice(h.index, i+1<hits.length ? hits[i+1].index : t.length);
+    const kind = (c.match(/中古マンション|新築マンション|中古戸建|中古一戸建|新築戸建|土地/)||[""])[0];
+    const isMansion = kind.includes("マンション");
+
+    const addr = (c.match(/([^\s]{0,6}?[都道府県][^\s]{0,10}?[市区郡][^\s]{0,12})(?=\s)/)||["",""])[1];
+    const areas = [...c.matchAll(/([\d,]+\.\d+)\s*(?:m2|㎡)/g)].map(m=>m[1].replace(/,/g,""));
+    const pm = c.match(/(?:専属専任|専任|一般|売主|代理)\s*(?:オーナーチェ\S*\s*)?([\d,]+)\s*万円/);
+    const years = [...c.matchAll(/((?:19|20)\d{2})\s*年/g)].map(m=>m[1]);
+    const bus  = (c.match(/バス\s*(\d+)\s*分/)||["",""])[1];
+    const walk = (c.match(/(?:徒歩|停歩)\s*(\d+)\s*分/)||["",""])[1];
+
+    const md = c.match(/(\d+\.\d+)\s*万円\s*(.*?)\s*((?:\d+|地下\d+)階)\s*([0-9][SLDK]{1,4}|ワンルーム)(?!\S)/);
+    const madori = md ? md[4]
+      : ((c.match(/([0-9][SLDK]{1,4}|ワンルーム)(?!\S)/g)||[]).pop() || "");
+    const bname = md ? (md[2].replace(/\s*\d+階$/,"").trim() + " " + md[3]).trim() : "";
+
+    rows.push({
+      id: h[1],
+      oc: /オーナーチェ/.test(c),
+      moushi: /申込あり/.test(c),
+      name: townOf(addr),
+      bname: bname,
+      price: pm ? pm[1].replace(/,/g,"") : "",
+      land: isMansion ? "" : (areas[0]||""),
+      bldg: isMansion ? (areas[0]||"") : (areas[1]||""),
+      built: years.length ? years[years.length-1] : "",
+      walk: bus ? "バス"+bus : walk,
+      madori: madori,
+      school: "",
+      cmt: ""
+    });
+  });
+  return {rows, total};
+}
+function toTSV(rows){
+  return rows.map(r=>COLS.map(c=>r[c]||"").join("\t")).join("\n");
+}
+async function readReins(input, target){
+  const files = [...input.files]; input.value = "";
+  if(!files.length) return;
+  const box = document.getElementById("reinsBox");
+  box.textContent = "読み込んでいます…";
+  try{
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    let all = [], total = 0;
+    for(const f of files){
+      const buf = await f.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+      let text = "";
+      for(let p=1;p<=pdf.numPages;p++){
+        const c = await (await pdf.getPage(p)).getTextContent();
+        text += "\n" + pageText(c.items);
+      }
+      const r = parseReinsText(text);
+      total = Math.max(total, r.total);
+      all = all.concat(r.rows);
+    }
+    const seen = new Set();
+    let rows = all.filter(r=>{ if(seen.has(r.id)) return false; seen.add(r.id); return true; });
+    const read = rows.length;
+    if(S.excOC) rows = rows.filter(r=>!r.oc);
+    if(S.excMoushi) rows = rows.filter(r=>!r.moushi);
+
+    if(!read){
+      box.textContent = "物件を読み取れませんでした。紙に印刷してスキャンしたPDFだと文字が拾えません。";
+      return;
+    }
+    S[target] = toTSV(rows);
+    if(total && !S.f1) S.f1 = String(total);
+    document.querySelector(`textarea[data-k="${target}"]`).value = S[target];
+    document.querySelector('input[data-k="f1"]').value = S.f1;
+    box.innerHTML = `検索総数 <b>${total||"—"}</b> 件　／　読み取り <b>${read}</b> 件　／　除外後 <b>${rows.length}</b> 件`;
+    render();
+  }catch(e){
+    box.textContent = "読み込めませんでした：" + e.message;
+  }
+}
+
+function yearOf(v){ const m = String(v).match(/(19|20)\d{2}/); return m? +m[0] : 0; }
+function han(s){ return String(s).replace(/[Ａ-Ｚａ-ｚ０-９]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)); }
+function roomsOf(v){ const m = han(v).match(/(\d+)\s*[SLDK]/i); return m? +m[1] : 0; }
+
+/* 1行を判定。ng に外れた項目名、mark に ◎○✕ */
+function judge(r){
+  const ng = {};
+  if(S.c_budget && n(S.v_budget) && n(r.price) > n(S.v_budget)) ng.price = 1;
+  if(S.c_walk && n(S.v_walk)){
+    if(/バス/.test(r.walk)) ng.walk = 1;
+    else if(n(r.walk) > n(S.v_walk)) ng.walk = 1;
+  }
+  const y = yearOf(r.built);
+  if(S.c_age    && n(S.v_age)    && y && (THIS_YEAR - y) > n(S.v_age)) ng.built = 1;
+  if(S.c_quake  && S.v_quake==="new" && y && y <= 1981) ng.quake = 1;
+  if(S.c_land   && n(S.v_land)   && n(r.land) && n(r.land) < n(S.v_land)) ng.land = 1;
+  if(S.c_bldg   && n(S.v_bldg)   && n(r.bldg) && n(r.bldg) < n(S.v_bldg)) ng.bldg = 1;
+  if(S.c_madori && n(S.v_madori) && roomsOf(r.madori) && roomsOf(r.madori) < n(S.v_madori)) ng.madori = 1;
+  if(S.c_school && S.v_school && r.school && !r.school.includes(S.v_school.trim())) ng.school = 1;
+
+  const hand = (r.cmt||"").trim().match(/^([◎○〇△✕×✖])\s*(.*)$/);
+  if(hand){
+    r.cmt = hand[2];
+    const m = hand[1];
+    return {ng, mark: (m==="×"||m==="✖") ? "✕" : (m==="〇"||m==="△") ? "○" : m};
+  }
+  const c = Object.keys(ng).length;
+  return {ng, mark: c===0 ? "◎" : c===1 ? "○" : "✕"};
+}
+function condStrip(){
+  const a = [];
+  if(S.c_budget && S.v_budget) a.push(`価格 ${man(S.v_budget)}万円以下`);
+  if(S.c_walk   && S.v_walk)   a.push(`駅徒歩 ${S.v_walk}分以内`);
+  if(S.c_age    && S.v_age)    a.push(`築 ${S.v_age}年以内`);
+  if(S.c_quake  && S.v_quake==="new") a.push("新耐震（昭和57年以降）");
+  if(S.c_land   && S.v_land)   a.push(`土地 ${S.v_land}㎡以上`);
+  if(S.c_bldg   && S.v_bldg)   a.push(`建物 ${S.v_bldg}㎡以上`);
+  if(S.c_madori && S.v_madori) a.push(`${S.v_madori}LDK以上`);
+  if(S.c_school && S.v_school) a.push(`${esc(S.v_school)}小学校区`);
+  return a.length ? `<div class="cond-strip">照合したご希望条件：${a.join("　／　")}</div>` : "";
+}
+function pageList(title, sub, text, startNo, tag){
+  const rows = parseRows(text);
+  if(!rows.length) return [];
+  const hasB = rows.some(r=>r.bname);
+  const hasL = rows.some(r=>r.land);
+  const hasS = rows.some(r=>r.school);
+  const PER = 15, pages = [];
+
+  for(let s=0; s<rows.length; s+=PER){
+    const part = rows.slice(s, s+PER);
+    const body = part.map(r=>{
+      const j = judge(r);
+      const c = (k, v) => `<td class="${j.ng[k]?"ng":""}">${j.ng[k]?`<s>${v}</s>`:v}</td>`;
+      const y = yearOf(r.built);
+      const quake = y ? (y<=1981 ? "旧耐震" : "新耐震") : "";
+      const builtCell = `<td class="${(j.ng.built||j.ng.quake)?"ng":""}">
+          ${j.ng.built?`<s>${esc(r.built)}</s>`:esc(r.built)}
+          ${y?`<span class="sub" style="${j.ng.quake?"color:#D0021B;font-weight:800":""}">築${THIS_YEAR-y}年・${quake}</span>`:""}</td>`;
+      const jc = j.mark==="◎"?"j-o":j.mark==="○"?"j-t":"j-x";
+      return `<tr class="${j.mark==="✕"?"row-x":""}">
+        <td class="name">${esc(r.name)}</td>
+        ${hasB?`<td class="name">${esc(r.bname)}</td>`:""}
+        ${c("price", man(r.price))}
+        ${hasL?c("land", esc(r.land)):""}
+        ${c("bldg", esc(r.bldg))}
+        ${builtCell}
+        ${c("walk", esc(r.walk))}
+        ${c("madori", esc(han(r.madori)))}
+        ${hasS?c("school", esc(r.school)):""}
+        <td class="j ${jc}">${j.mark}</td>
+        <td class="cmt">${esc(r.cmt)}</td></tr>`;
+    }).join("");
+
+    const cont = s>0 ? `（つづき ${s+1}〜${Math.min(s+PER, rows.length)}件目）` : sub;
+    pages.push(shell((startNo+pages.length)+"枚目："+tag, "",
+      head(title, cont) + (s===0 ? condStrip() : "") +
+      `<table class="list"><thead><tr>
+        <th>所在</th>${hasB?"<th>建物名・階</th>":""}
+        <th>価格<span class="sub">万円</span></th>
+        ${hasL?'<th>土地<span class="sub">㎡</span></th>':""}
+        <th>${hasL?"建物":"専有"}<span class="sub">㎡</span></th>
+        <th>築年</th><th>徒歩<span class="sub">分</span></th>
+        <th>間取り</th>${hasS?"<th>校区</th>":""}
+        <th>判定</th><th>備考</th></tr></thead>
+        <tbody>${body}</tbody></table>
+       <p class="legend-note">
+         赤字と取り消し線は、ご希望条件から外れている項目です。<br>
+         ◎ … 条件をすべて満たす　　○ … 1つだけ外れる　　✕ … 2つ以上外れる</p>`));
+  }
+  return pages;
+}
+
+/* ========== プレビュー描画 ========== */
+function render(){
+  const total = n(S.loan) + n(S.own);
+  const cost = n(P[0].price) + n(P[0].reno) + n(S.fee);
+  document.getElementById("calcBox").innerHTML =
+    `資金総額（借入＋自己資金） <b>${man(total)}</b> 万円　／　必要額（物件＋リノベ＋諸費用） <b>${man(cost)}</b> 万円`;
+
+  const k = simKariire();
+  const use = (v) => `<button class="mini" onclick="S.loan='${Math.round(v)}';syncInputs();render()">これを使う</button>`;
+  document.getElementById("simBox1").innerHTML = (k.rent+k.income+k.hope) > 0 ? `
+    今の家賃と同じなら <b>${man(Math.round(k.rent))}</b> 万円 ${k.rent>0?use(k.rent):""}<br>
+    ご年収の基準では <b>${man(Math.round(k.income))}</b> 万円 ${k.income>0?use(k.income):""}<br>
+    ご希望の返済額なら <b>${man(Math.round(k.hope))}</b> 万円 ${k.hope>0?use(k.hope):""}`
+    : "家賃・年収・ご希望の返済額のどれかを入れてください";
+
+  const h = simHikaku();
+  document.getElementById("simBox2").innerHTML = h ? `
+    住居費の総額　今 <b>${man(Math.round(h.now.sum))}</b> 万円　／　${h.after}年後 <b>${man(Math.round(h.fut.sum))}</b> 万円<br>
+    65歳時の残元金　今 <b>${man(Math.round(h.now.zansai))}</b> 万円　／　${h.after}年後 <b>${man(Math.round(h.fut.zansai))}</b> 万円<br>
+    差額 <b>${man(Math.round(h.diff))}</b> 万円（1日あたり ${Math.round(h.day).toLocaleString("ja-JP")} 円）`
+    : "現在のご年齢と、上の資金計画の借入総額を入れてください";
+
+  const parts = [];
+  let no = 1;
+  const add = fn => { const s = fn(no); if(s){ parts.push(s); no++; } };
+
+  parts.push(pageCover()); no++;
+  add(p => pageText("ごあいさつ", S.greetTitle, S.greetBody, p));
+  add(p => pageText("はじめに", S.mindTitle, S.mindBody, p));
+  add(p => pageNeeds(p));
+  add(p => pageFunnel(p));
+  const addMany = fn => { fn(no).forEach(s=>{ parts.push(s); no++; }); };
+  if(S.useSale) addMany(p => pageList("いま売り出されている物件", "ご希望条件と照らし合わせました", S.saleData, p, "売出一覧"));
+  if(S.useSold) addMany(p => pageList("このエリアの成約事例", "実際に売買が成立した価格です", S.soldData, p, "成約事例"));
+  add(p => pageMoney(p, total));
+  add(p => pageProp(0, p));
+  add(p => pageImgs(0, p));
+  add(p => pageProp(1, p));
+  add(p => pageImgs(1, p));
+  add(p => pageCompare(p));
+  add(p => pageText("プロとしてお伝えしたいこと", S.proTitle, S.proBody, p));
+
+  document.getElementById("stage").innerHTML = parts.join("");
+}
+function shell(tag, cls, inner){
+  return `<div class="page ${cls||""}"><div class="page-tag">${tag}</div>${inner}
+    <div class="foot"><span>${esc(S.customer||"　")} 様</span><span>${esc(S.company||"")}</span></div></div>`;
+}
+function head(title, sub){
+  return `<div class="p-head"><h2>${esc(title)}</h2><span>${esc(sub||"")}</span></div>`;
+}
+function pageCover(){
+  return `<div class="page cover"><div class="page-tag">1枚目：表紙</div>
+    <div class="lead">物件購入についての</div>
+    <h1>ご提案書</h1>
+    <div class="rule"></div>
+    <div class="cname">${esc(S.customer||"お客様名")}<small>様</small></div>
+    <div class="meta">${esc(S.date||"")}<br>担当　${esc(S.staff||"")}</div>
+    <div class="logo">${esc(S.company||"")}</div></div>`;
+}
+function pageText(tag, title, body, no){
+  return shell(no+"枚目："+tag,"",
+    head(tag) + `<p class="quote">${esc(title)}</p>
+    <div class="body-text">${esc(body)}</div>`);
+}
+function pageNeeds(no){
+  const blk = (t,v)=> `<div class="need"><h3>${esc(t||"")}</h3>${ul(v)}</div>`;
+  return shell(no+"枚目：ご要望","",
+    head("お客様のご要望","ヒアリングの内容をまとめました") +
+    blk(S.need1t,S.need1) + blk(S.need2t,S.need2) + blk(S.need3t,S.need3) +
+    `<div class="note-box"><div class="body-text">${esc(S.msg)}</div>
+     <div style="text-align:right;margin-top:10px;font-size:12pt;">担当　${esc(S.staff||"")}</div></div>`);
+}
+function pageFunnel(no){
+  const w = [92,66,42];
+  const steps = [
+    {n:S.f1, t:"エリア内の中古物件", cls:""},
+    {n:S.f2, t:"ご希望条件に合う物件", cls:"mid"},
+    {n:S.f3, t:"ご内覧いただく物件", cls:"last"}
+  ];
+  let f = `<div class="funnel">`;
+  steps.forEach((s,i)=>{
+    f += `<div class="fstep ${s.cls}" style="width:${w[i]}%"><div class="n">${man(s.n)}<small>件</small></div>
+      <div class="t">${s.t}</div></div>`;
+    if(i<2) f += `<div class="arrow">▼</div>`;
+  });
+  f += `</div>`;
+  return shell(no+"枚目：絞り込み","",
+    head("ご提案のポイント","ここまでの絞り込み") + f +
+    `<div class="note-box" style="margin-top:22px"><div class="body-text">${esc(S.ftext)}</div></div>`);
+}
+function pageMoney(no, total){
+  const p = n(P[0].price), r = n(P[0].reno), fee = n(S.fee);
+  const rows = [
+    ["物件購入資金", p], ["リノベーション資金", r], ["諸費用", fee]
+  ];
+  let t = `<table class="breakdown">
+    <tr><th>お借入金額</th><td>${man(S.loan)} 万円</td></tr>
+    <tr><th>自己資金</th><td>${man(S.own)} 万円</td></tr>
+    <tr class="total"><th>資金総額</th><td>${man(total)} 万円</td></tr></table>
+    <table class="breakdown" style="margin-top:18px">
+    <tr><th colspan="2" style="background:var(--navy);color:#fff;text-align:center">資金の内訳</th></tr>`;
+  rows.forEach(([l,v])=> t += `<tr><th>${l}</th><td>${man(v)} 万円</td></tr>`);
+  t += `<tr class="total"><th>合計</th><td>${man(p+r+fee)} 万円</td></tr></table>`;
+
+  const money = `<div class="money-grid">
+    <div class="money hi"><div class="lbl">月々のご返済</div>
+      <div class="val">${S.month? n(S.month).toLocaleString("ja-JP"):"—"}<small>万円</small></div></div>
+    <div class="money"><div class="lbl">お借入金額</div>
+      <div class="val">${man(S.loan)}<small>万円</small></div></div>
+    <div class="money"><div class="lbl">返済負担率</div>
+      <div class="val">${S.ratio? S.ratio:"—"}<small>％</small></div></div></div>`;
+
+  const cond = `<p style="font-size:11.5pt;color:var(--sub);margin-top:14px">
+    金利 ${esc(S.rate||"—")}％／返済期間 ${esc(S.years||"—")}年${n(S.bonus)?"／ボーナス返済 "+S.bonus+"万円（年額）":"／ボーナス返済なし"}
+    <br>※金利は試算時点のものです。実際のご融資条件は金融機関の審査により決定します。</p>`;
+
+  let lp = "";
+  if(S.lp_zansai!=="" || S.lp_diff!==""){
+    const yr = S.lp_after || "数";
+    lp = `<table class="breakdown" style="margin-top:20px">
+      <tr><th style="width:40%">　</th>
+        <th style="background:var(--navy);color:#fff;text-align:center">今ご購入する場合</th>
+        <th style="background:#6B7A93;color:#fff;text-align:center">${esc(yr)}年後にご購入する場合</th></tr>
+      <tr><th>住居費の総額</th><td style="text-align:center">${man(S.lp_now)} 万円</td>
+        <td style="text-align:center">${man(S.lp_future)} 万円</td></tr>
+      <tr><th>65歳時のローン残債</th>
+        <td style="text-align:center;font-size:16pt;color:var(--navy)">${man(S.lp_zansai)} 万円</td>
+        <td style="text-align:center;font-size:16pt;color:#D0021B">${man(S.lp_zansai_f)} 万円</td></tr>
+      <tr class="total"><th>先に延ばした場合の差</th>
+        <td colspan="2" style="text-align:center">${man(S.lp_diff)} 万円　（1日あたり ${S.lp_day? n(S.lp_day).toLocaleString("ja-JP"):"—"} 円）</td></tr>
+    </table>`;
+  }
+
+  return shell(no+"枚目：資金計画","", head("資金計画","無理なくご返済いただける計画です") + money + t + cond + lp);
+}
+function pageProp(i, no){
+  const d = P[i], p = n(d.price), r = n(d.reno);
+  const spec = [
+    ["交通", d.access], ["土地面積", d.land], ["建物面積", d.bldg],
+    ["築年月", d.built], ["間取り", d.plan], ["構造・階数", d.floor],
+    ["前面道路", d.road], ["通学先", d.school], ["周辺施設", d.life]
+  ];
+  let t = `<table class="spec">`;
+  spec.forEach(([l,v])=> t += `<tr><th>${l}</th><td>${v? esc(v) : '<span class="empty">—</span>'}</td></tr>`);
+  t += `<tr><th>リノベ概算</th><td>${man(r)} 万円</td></tr>
+        <tr><th style="background:var(--navy);color:#fff">物件＋リノベ 合計</th>
+        <td style="background:#FDF3E7;color:var(--orange);font-size:16pt;font-weight:800">${man(p+r)} 万円</td></tr></table>`;
+
+  const first = d.imgs[0];
+  const img = first
+    ? `<div class="imgcell" style="margin-top:14px"><img src="${first.src}" alt="">
+       ${first.cap?`<div class="cap">${esc(first.cap)}</div>`:""}</div>`
+    : `<div class="imgcell" style="margin-top:14px"><div class="placeholder">画像を追加すると、ここに外観や間取りが入ります</div></div>`;
+
+  return shell(no+"枚目：物件"+(i+1),"",
+    head("物件"+(i===0?"①":"②")) +
+    `<div class="price-bar"><span class="addr">${esc(d.addr||"所在地未入力")}</span>
+      <span class="p">${man(p)}<small>万円</small></span></div>` + t + img);
+}
+function pageImgs(i, no){
+  const rest = P[i].imgs.slice(1, 5);
+  let g = `<div class="imggrid">`;
+  for(let j=0;j<4;j++){
+    const im = rest[j];
+    g += im
+      ? `<div class="imgcell"><img src="${im.src}" alt="">${im.cap?`<div class="cap">${esc(im.cap)}</div>`:""}</div>`
+      : `<div class="imgcell"><div class="placeholder">駅まで／学校まで／買い物／通学路<br>などのスクリーンショット</div></div>`;
+  }
+  g += `</div>`;
+  return shell(no+"枚目：物件"+(i+1)+" 周辺情報","",
+    head("物件"+(i===0?"①":"②")+"　周辺情報", esc(P[i].addr||"")) + g);
+}
+function pageCompare(no){
+  const cell = (i)=>{
+    const d = P[i], p = n(d.price), r = n(d.reno);
+    const kv = [["価格", man(p)+" 万円"], ["リノベ", man(r)+" 万円"],
+      ["総額", man(p+r)+" 万円"], ["築年", d.built||"—"],
+      ["土地", d.land||"—"], ["建物", d.bldg||"—"], ["間取り", d.plan||"—"]];
+    return kv.map(([k,v])=>`<div class="kv"><span>${k}</span><b>${esc(v)}</b></div>`).join("");
+  };
+  return shell(no+"枚目：比較表","",
+    head("ご提案物件の比較") +
+    `<table class="cmp">
+      <thead><tr><th class="c0"></th><th class="c1">特徴</th><th class="c2">メリット</th><th class="c3">気になる点</th></tr></thead>
+      <tbody>
+        <tr><th>物件①<br>${man(n(P[0].price))}<br>万円</th>
+          <td class="c1">${cell(0)}</td><td class="c2">${ul(P[0].merit)}</td><td class="c3">${ul(P[0].demerit)}</td></tr>
+        <tr><th>物件②<br>${man(n(P[1].price))}<br>万円</th>
+          <td class="c1">${cell(1)}</td><td class="c2">${ul(P[1].merit)}</td><td class="c3">${ul(P[1].demerit)}</td></tr>
+      </tbody></table>`);
+}
+
+/* ========== 保存・読込 ========== */
+function saveJson(){
+  const data = JSON.stringify({S, P}, null, 1);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([data], {type:"application/json"}));
+  a.download = (S.customer||"提案書") + "_入力内容.json";
+  a.click();
+}
+function loadJsonFile(input){
+  const f = input.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = e=>{
+    try{
+      const d = JSON.parse(e.target.result);
+      S = Object.assign({}, defaults, d.S||{});
+      P = (d.P||[blankProp(),blankProp()]).map(p=>Object.assign(blankProp(), p));
+      buildPropPanel(0); buildPropPanel(1);
+      renderImgList(0); renderImgList(1);
+      bind(); render();
+    }catch(err){
+      alert("読み込めませんでした。このツールで保存したJSONファイルを選んでください。");
+    }
+    input.value = "";
+  };
+  r.readAsText(f);
+}
+
+/* ========== 起動 ========== */
+buildPropPanel(0); buildPropPanel(1);
+bind(); render();
+</script>
+</body>
+</html>

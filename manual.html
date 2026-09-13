@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>案内前 提案書ビルダー 使い方マニュアル ｜ ViVi不動産</title>
+<style>
+:root{
+  --navy:#16294B; --navy-soft:#24416F; --orange:#E07B1E; --gold:#C08A22;
+  --ink:#23262C; --sub:#5C6472; --line:#D6DCE5; --panel:#EEF1F6;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; background:var(--panel); color:var(--ink);
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;
+  font-size:17.5px; line-height:1.9;
+}
+.sheet{max-width:940px;margin:0 auto;background:#fff;padding:0 0 80px;box-shadow:0 3px 14px rgba(20,30,55,.14);}
+header{background:var(--navy);color:#fff;padding:36px 44px;}
+header h1{margin:0;font-size:30px;letter-spacing:.04em;}
+header p{margin:10px 0 0;color:#B9C6DC;font-size:17px;}
+main{padding:8px 44px 0;}
+
+h2{
+  font-size:25px;color:var(--navy);margin:52px 0 18px;
+  border-left:9px solid var(--orange);padding-left:14px;line-height:1.4;
+}
+h3{font-size:21px;color:var(--navy-soft);margin:34px 0 10px;}
+p{margin:12px 0;}
+ol,ul{margin:12px 0;padding-left:1.6em;}
+li{margin-bottom:10px;}
+b{color:var(--navy);}
+.lead{font-size:19px;}
+
+.step{border:2px solid var(--line);border-radius:10px;padding:20px 24px;margin:18px 0;}
+.step h4{margin:0 0 8px;font-size:20px;color:var(--navy);}
+.step .num{
+  display:inline-block;background:var(--navy);color:#fff;border-radius:50%;
+  width:34px;height:34px;line-height:34px;text-align:center;font-size:18px;font-weight:800;margin-right:10px;}
+
+.tip{background:#FBF4E9;border:2px solid var(--gold);border-radius:8px;padding:16px 22px;margin:18px 0;}
+.warn{background:#FFF4F4;border:2px solid #D0021B;border-radius:8px;padding:16px 22px;margin:18px 0;}
+.warn b{color:#D0021B;}
+
+code, .code{
+  background:#F2F5F9;border:1px solid var(--line);border-radius:5px;
+  padding:2px 7px;font-family:"Consolas","Meiryo",monospace;font-size:16px;color:var(--navy);}
+pre{
+  background:#F2F5F9;border:1px solid var(--line);border-radius:8px;
+  padding:16px 20px;font-size:16px;overflow-x:auto;line-height:1.8;}
+
+table{width:100%;border-collapse:collapse;margin:18px 0;}
+th,td{border:1px solid var(--line);padding:11px 14px;font-size:16.5px;vertical-align:top;}
+th{background:#F2F5F9;color:var(--navy);text-align:left;white-space:nowrap;}
+
+.mark{font-size:24px;font-weight:800;}
+.m1{color:#1F7A5A;} .m2{color:var(--gold);} .m3{color:#D0021B;}
+
+.qa{border-top:2px solid var(--line);padding:22px 0 6px;}
+.qa .q{font-size:19.5px;font-weight:800;color:var(--navy);margin:0 0 10px;}
+.qa .q::before{content:"Q";background:var(--navy);color:#fff;border-radius:5px;padding:2px 10px;margin-right:12px;font-size:17px;}
+.qa .a{margin:0;}
+.qa .a::before{content:"A";background:var(--orange);color:#fff;border-radius:5px;padding:2px 10px;margin-right:12px;font-size:17px;font-weight:800;}
+
+footer{margin:60px 44px 0;padding-top:20px;border-top:2px solid var(--line);color:var(--sub);font-size:15px;}
+
+@media print{
+  @page{size:A4 portrait;margin:14mm;}
+  body{background:#fff;font-size:11pt;line-height:1.75;}
+  .sheet{box-shadow:none;max-width:none;padding:0;}
+  header{padding:0 0 14px;background:#fff;color:var(--navy);border-bottom:3px solid var(--navy);}
+  header p{color:var(--sub);}
+  main{padding:0;}
+  h2{font-size:16pt;margin:26px 0 10px;page-break-after:avoid;}
+  h3{font-size:13pt;page-break-after:avoid;}
+  .step,.tip,.warn,.qa{page-break-inside:avoid;}
+  footer{margin:30px 0 0;}
+}
+@media (max-width:760px){
+  header,main,footer{padding-left:20px;padding-right:20px;}
+  footer{margin-left:0;margin-right:0;}
+}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+<header>
+  <h1>案内前 提案書ビルダー　使い方マニュアル</h1>
+  <p>ViVi不動産株式会社　社内ツール</p>
+</header>
+
+<main>
+
+<p class="lead">
+このツールは、<b>初回面談の資金計画</b>と、<b>ご案内前の提案書づくり</b>の2つを1本でこなします。
+レインズのPDF、Zohoの顧客情報、図面PDFをそのまま読み込めるので、これまで手で打ち直していた作業がなくなります。
+</p>
+
+<h2>まず覚えること：画面はタブで分かれています</h2>
+
+<p>
+画面の左上に<b>タブが2つ</b>あります。開いたときは必ず「資金計画（面談用）」が選ばれています。
+</p>
+
+<table>
+  <tr><th style="width:34%">資金計画（面談用）</th>
+      <td>初回面談でお客様と一緒に見る画面です。<b>顧客名も物件情報も表示されません。</b>資金計画の2ページだけが右に出ます。</td></tr>
+  <tr><th>提案書をつくる</th>
+      <td>ご案内前の提案書を組み立てる画面です。顧客情報、ご要望、物件、事例一覧などを入力します。</td></tr>
+</table>
+
+<div class="tip">
+<b>面談中は必ず「資金計画（面談用）」のままで。</b>
+このタブでは他のお客様の情報も、これから提案する物件の情報も、画面に出ません。
+安心してお客様に画面を見せられます。
+</div>
+
+<h2>1．初回面談での使い方</h2>
+
+<div class="step">
+  <h4><span class="num">1</span>お客様の家計とご年収を入れる</h4>
+  <p>
+    左の「借入可能額の試算」に、いまの家賃・共益費・駐車場代、そしてご年収を入れます。
+    入力するそばから右の棒グラフが伸びるので、そのままお客様に見ていただけます。
+  </p>
+</div>
+
+<div class="step">
+  <h4><span class="num">2</span>ご希望の返済額を入れる</h4>
+  <p>
+    その下の「ご希望の返済額」に、毎月いくらまでなら無理なく返せるかを入れます。
+    ボーナス・金利・返済期間もここです。<b>この3本目の基準がオレンジで強調されます。</b>
+  </p>
+</div>
+
+<div class="step">
+  <h4><span class="num">3</span>今買う場合と先に延ばす場合を見せる</h4>
+  <p>
+    「今買う場合と先に延ばした場合」に、現在のご年齢と何年後に買う想定かを入れます。
+    自己資金、毎月の積立、購入までの家賃も入れると、住居費の総額、65歳時のローン残高、
+    <b>「今買うほうが◯◯万円おトク。1日あたり◯◯円」</b>まで出ます。
+  </p>
+</div>
+
+<div class="step">
+  <h4><span class="num">4</span>お渡しする場合は印刷する</h4>
+  <p>
+    上部の「印刷する範囲」が<b>「資金計画だけ」</b>になっていることを確認して、「印刷・PDF保存」を押します。
+    2ページだけが出ます。提案書の中身は印刷されません。
+  </p>
+</div>
+
+<div class="tip">
+借入可能額の3本には、それぞれ<b>「これを使う」</b>ボタンが付いています。
+押すと、その金額が提案書側の借入総額に入ります。面談の結果をそのまま持ち越せます。
+</div>
+
+<h2>2．提案書のつくり方</h2>
+
+<p>タブを「提案書をつくる」に切り替えます。上から順に埋めていけば完成します。</p>
+
+<h3>① 基本情報 ― Zohoから貼るだけ</h3>
+
+<p>
+Zohoでそのお客様の画面を開き、顧客情報のところを<b>範囲選択してコピー</b>します。
+ツールの「Zohoの顧客情報を貼り付け」に貼って、「貼り付けた内容を読み取る」を押します。
+お名前・担当者・年齢が自動で入ります。
+</p>
+<p>
+ご提案日はカレンダーから選びます。表紙には「2026年9月13日」の形で出ます。
+</p>
+<p>
+以前エクセルで資金計画を作ったお客様は、<b>「過去のエクセルを読み込む」</b>からそのファイルを選んでください。
+お名前と資金計画の数字がまとめて入ります。新しいお客様にこの操作は不要です。
+</p>
+
+<h3>② ご要望 ― 改行するだけで箇条書きになります</h3>
+
+<p>
+優先順位①②③に、見出しと内容を入れます。<b>1行が1項目</b>になるので、Zohoのヒアリング欄からそのまま貼っても形になります。
+</p>
+
+<h3>③ 事例一覧と判定条件 ― ここがいちばん効きます</h3>
+
+<p><b>先に判定条件を決めます。</b>チェックを入れた条件だけで判定します。お客様ごとに変えてください。</p>
+
+<table>
+  <tr><th>予算の上限</th><td>これを超えると赤字になります</td></tr>
+  <tr><th>駅から徒歩</th><td>バス便の物件は自動で条件を外れた扱いになります</td></tr>
+  <tr><th>築年数</th><td>今年から数えた築年数で判定します</td></tr>
+  <tr><th>耐震基準</th><td>「新耐震のみ」を選ぶと、昭和56年以前の物件が赤字になります</td></tr>
+  <tr><th>土地面積・建物面積</th><td>指定した広さを下回ると赤字になります</td></tr>
+  <tr><th>居室数</th><td>4を入れると3LDK以下が赤字になります</td></tr>
+  <tr><th>小学校区</th><td>校区の欄に入力があるときだけ判定します</td></tr>
+</table>
+
+<p><b>次にレインズのPDFを読み込みます。</b>「売出PDFを読み込む」を押してファイルを選びます。</p>
+
+<div class="warn">
+<b>50件ずつに分かれているPDFは、まとめて全部選んでください。</b>
+ファイル選択の画面で複数選べます。1枚ずつ読み込むと、前のデータが消えて最後の1枚だけになります。
+</div>
+
+<p>
+読み込むと、下の欄にデータが並び、右に一覧表ができます。
+「オーナーチェンジを除く」「申込ありを除く」にチェックを入れておけば、読み込む時点で外れます。
+</p>
+
+<p>
+<b>絞り込みの経過</b>が表示されます。条件をひとつずつ足したときに何件残るかが出るので、
+どこまで条件を効かせるか決める材料にしてください。この数字はそのまま提案書の絞り込みページになります。
+</p>
+
+<p>
+<b>「条件に近い順に並べる」</b>にチェックを入れて件数を指定すると、
+条件を満たす物件が上に来るように並び替えて、指定件数だけ載せます。50件なら4ページほどになります。
+</p>
+
+<h3>判定の記号</h3>
+
+<table>
+  <tr><th style="width:90px"><span class="mark m1">◎</span></th><td>指定した条件を<b>すべて</b>満たしています</td></tr>
+  <tr><th><span class="mark m2">○</span></th><td>条件が<b>1つだけ</b>外れています</td></tr>
+  <tr><th><span class="mark m3">✕</span></th><td>条件が<b>2つ以上</b>外れています。行の背景も薄い赤になります</td></tr>
+</table>
+
+<p>
+外れている項目は、その欄だけが<b>赤字に取り消し線</b>で出ます。
+どこが合わなかったのかが一目で分かるので、お客様への説明がそのままできます。
+</p>
+
+<h3>一覧の手直し</h3>
+
+<p>読み込んだあと、下の貼り付け欄で自由に直せます。</p>
+<ul>
+  <li><b>いらない行を消す</b> ― その行をまるごと削除します</li>
+  <li><b>備考を書く</b> ― 行の最後に「駐車場なし」「間取り変更不可」など</li>
+  <li><b>判定を変える</b> ― 備考の<b>先頭</b>に <code>◎</code> <code>○</code> <code>✕</code> のどれかを書くと、自動判定より優先されます</li>
+</ul>
+
+<p>列の順番はこうです。手で足すときも同じ並びにしてください。</p>
+<pre>町名　→　建物名　→　価格　→　土地㎡　→　建物㎡　→　築年　→　徒歩分　→　間取り　→　校区　→　備考</pre>
+
+<h3>④ 物件①②</h3>
+
+<p>物件ごとに、価格・面積・築年などを入れます。物件①の価格とリノベ費用は、資金計画の総額計算にも使われます。</p>
+
+<p><b>地図リンクを作る</b>ボタンを押すと、その住所を起点にしたGoogleマップのリンクが並びます。
+駅・小学校・中学校は名前を入れた分だけ経路が開きます。スーパー、コンビニ、ドラッグストア、病院、公園は周辺検索で開きます。
+順にクリックして画面を撮り、「画像を追加」で取り込んでください。</p>
+
+<p><b>周辺環境図</b>は、物件を真ん中に置いた図です。1行1施設で、名前・分・距離を入れます。
+分と距離は、上の地図リンクで開いた画面に出ている数字をそのまま書き写してください。</p>
+
+<pre>パルコープ西くずは店	6	450m
+樟葉西小学校	10	700m
+樟葉駅	18	1.3km</pre>
+
+<p><b>図面PDFを取り込む</b>を押すと、図面が画像になって1ページ丸ごと入ります。3枚までです。</p>
+
+<p>画像の一覧にある<b>「1頁」</b>のチェックを入れると、その画像は専用ページで大きく出ます。
+外すと、物件カードの中や2×2の枠に小さく入ります。</p>
+
+<h3>⑤ 固定ページの文章</h3>
+
+<p>
+ごあいさつ、「100％満足する物件は存在しません」、プロとしてお伝えしたいこと。
+この3ページは毎回同じです。<b>一度ご自分の言葉に直したら、「入力を保存」でファイルに残しておいてください。</b>
+次からはそれを読み込むだけで済みます。
+</p>
+
+<h2>3．印刷と保存</h2>
+
+<h3>印刷する範囲</h3>
+<table>
+  <tr><th style="width:30%">提案書ぜんぶ</th><td>表紙から最後まで、全部印刷します</td></tr>
+  <tr><th>資金計画だけ</th><td>面談用の2ページだけ。初回面談でお渡しするときはこれ</td></tr>
+  <tr><th>資金計画をのぞく</th><td>資金計画の2ページを外した提案書</td></tr>
+</table>
+
+<p>「印刷・PDF保存」を押すと、ブラウザの印刷画面が出ます。プリンタの代わりに「PDFに保存」を選べばPDFになります。</p>
+
+<div class="warn">
+<b>入力した内容は自動では残りません。</b>
+画面を閉じると消えます。必ず「入力を保存」でファイルに書き出してください。
+お客様ごとにファイルが1つできます。次に開くときは「保存を読み込む」から選びます。
+</div>
+
+<h2>よくある質問</h2>
+
+<div class="qa">
+  <p class="q">レインズのPDFを読み込んだら「物件を1件も見つけられませんでした」と出ました</p>
+  <p class="a">同じ画面に「取り出せた文字数」が出ています。この数字を見てください。
+  ほぼ0なら、紙に印刷してスキャンしたPDFです。文字が画像になっているので読めません。
+  レインズの検索結果画面から「PDFとして保存」で出し直してください。
+  文字数が出ているのに0件なら、表の形が想定と違います。そのPDFを矢郷まで送ってください。</p>
+</div>
+
+<div class="qa">
+  <p class="q">売り出し物件が78件あります。50件ずつ2枚に分かれています</p>
+  <p class="a">ファイルを選ぶ画面で、<b>2枚とも選んでください</b>。件数に上限はありません。
+  同じ物件が両方に入っていても、物件番号で照合して1件にまとめます。
+  1枚ずつ読み込むと前のデータが消えるので、必ずまとめて選んでください。</p>
+</div>
+
+<div class="qa">
+  <p class="q">50件も載せたら分厚くなりませんか</p>
+  <p class="a">4〜6ページになります。これは意図的です。
+  「これだけの物件を見た中で、残ったのがこの2件です」という絞り込みの経過そのものが提案になります。
+  枚数を減らしたいときは「条件に近い順に並べる」の件数を小さくしてください。</p>
+</div>
+
+<div class="qa">
+  <p class="q">数字は合っているのに、現地を見たら道が狭かった。判定を変えたい</p>
+  <p class="a">備考の先頭に <code>✕</code> と書いてください。そのあとに理由を続けます。
+  例：<code>✕ 前面道路が狭く車の出し入れが難しい</code>。自動判定より優先されます。</p>
+</div>
+
+<div class="qa">
+  <p class="q">校区の欄が空っぽです</p>
+  <p class="a">レインズには校区の情報が入っていないので、自動では入りません。
+  必要な場合は貼り付け欄で手入力してください。校区の欄が空の行は、校区の条件で赤字になることはありません。</p>
+</div>
+
+<div class="qa">
+  <p class="q">徒歩の欄に「バス23」と出ています</p>
+  <p class="a">バス便の物件です。「駅から徒歩」の条件にチェックが入っていると、この物件は条件を外れた扱いになります。
+  バス便でも構わないお客様の場合は、徒歩の条件のチェックを外してください。</p>
+</div>
+
+<div class="qa">
+  <p class="q">お客様のお名前が違う名前で入りました</p>
+  <p class="a">過去のエクセルを読み込んだ場合、お名前は<b>ファイル名の先頭</b>から取っています。
+  ファイル名の付け方が違うと、別の文字が入ることがあります。その場合は下のお名前の欄で直してください。
+  エクセル側に「お客様名」というセルを作って右隣に名前を入れておけば、そちらが優先されます。</p>
+</div>
+
+<div class="qa">
+  <p class="q">Zohoの貼り付けで何も拾えませんでした</p>
+  <p class="a">コピーした範囲に「氏名」の行が入っているか確認してください。
+  項目名と中身が同じ行にあっても、中身が次の行にあっても、どちらでも読めます。</p>
+</div>
+
+<div class="qa">
+  <p class="q">面談中に、他のお客様の情報が画面に出ませんか</p>
+  <p class="a">出ません。「資金計画（面談用）」タブでは、資金計画の入力欄と2ページだけが表示されます。
+  ただし、<b>前のお客様の内容を読み込んだまま次の面談を始めると、数字が残ります。</b>
+  面談の前に画面を開き直すか、数字を消してから始めてください。</p>
+</div>
+
+<div class="qa">
+  <p class="q">65歳時のローン残高は、何の金額ですか</p>
+  <p class="a">その時点で<b>まだ返していない元金</b>です。銀行の残高証明に出る金額と同じ考え方です。
+  これから払う利息は含みません。</p>
+</div>
+
+<div class="qa">
+  <p class="q">物件番号や取引態様は提案書に出ますか</p>
+  <p class="a">出ません。読み込みはしますが、提案書には載せない作りにしています。
+  お客様にお渡しする紙に、業者間の情報を残さないためです。</p>
+</div>
+
+<div class="qa">
+  <p class="q">画像をたくさん入れたら、保存ファイルが重くなりました</p>
+  <p class="a">画像も一緒に保存されるので、その分ファイルが大きくなります。
+  完成したらPDFにしておいて、保存ファイルは必要なものだけ残す運用をおすすめします。</p>
+</div>
+
+<div class="qa">
+  <p class="q">資金計画の数字を直したら、提案書の比較表が変わりません</p>
+  <p class="a">「この結果を提案書に反映する」を押してください。
+  面談用の試算は、このボタンを押したときだけ提案書側に移ります。押さずに数字だけ動かしても反映されません。</p>
+</div>
+
+<div class="qa">
+  <p class="q">これまでのエクセルはもう使わなくていいですか</p>
+  <p class="a">新しいお客様には不要です。ツールの中で同じ計算ができます。
+  すでにエクセルで作ってあるお客様は、そのファイルを読み込んでください。</p>
+</div>
+
+</main>
+
+<footer>
+  ViVi不動産株式会社　社内ツール　案内前 提案書ビルダー<br>
+  うまくいかないところ、直したいところがあれば矢郷まで。実際に使ってみて出てきた要望から直していきます。
+</footer>
+
+</div>
+</body>
+</html>

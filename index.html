@@ -266,8 +266,8 @@ textarea{min-height:76px;resize:vertical;line-height:1.6;}
 
   <fieldset>
     <legend>1. 基本情報</legend>
-    <p class="hint">最初の面談で使った資金計画シミュレーションのエクセルを読み込むと、お名前と資金計画がまとめて入ります。</p>
-    <button class="btn" onclick="document.getElementById('xlsFile').click()">資金計画エクセルを読み込む</button>
+    <p class="hint"><b>過去のお客様用です。</b>以前エクセルで資金計画を作ったお客様は、そのファイルを読み込むとお名前と数字がまとめて入ります。<br>新しいお客様は、下の「6. 借入可能額の試算」と「7. 今買う場合と先に延ばした場合」で完結します。エクセルは不要です。</p>
+    <button class="btn ghost" onclick="document.getElementById('xlsFile').click()">過去のエクセルを読み込む</button>
     <input type="file" id="xlsFile" accept=".xlsx,.xlsm" style="display:none" onchange="readXls(this)">
     <div class="calc" id="xlsBox">まだ読み込んでいません</div>
 
@@ -777,27 +777,28 @@ function parseReinsText(raw){
   const mt = t.match(/[∕／\/]\s*([\d,]+)\s*件/);
   if(mt) total = n(mt[1].replace(/,/g,""));
 
-  const hits = [...t.matchAll(/(?:^|\s)(\d{12})(?=\s)/g)];
+  const hits = [...t.matchAll(/\d{12,}/g)]
+    .map(m=>({ id: m[0].slice(-12), index: m.index + m[0].length - 12 }));
   const rows = [];
   hits.forEach((h,i)=>{
     const c = t.slice(h.index, i+1<hits.length ? hits[i+1].index : t.length);
     const kind = (c.match(/中古マンション|新築マンション|中古戸建|中古一戸建|新築戸建|土地/)||[""])[0];
     const isMansion = kind.includes("マンション");
 
-    const addr = (c.match(/([^\s]{0,6}?[都道府県][^\s]{0,10}?[市区郡][^\s]{0,12})(?=\s)/)||["",""])[1];
+    const addr = (c.match(/([^\s]{0,6}?[都道府県][^\s]{0,12}?[市区郡][^\s]{0,14}?)(?=\s*(?:専属専任|専任|一般|売主|代理))/)||["",""])[1];
     const areas = [...c.matchAll(/([\d,]+\.\d+)\s*(?:m2|㎡)/g)].map(m=>m[1].replace(/,/g,""));
     const pm = c.match(/(?:専属専任|専任|一般|売主|代理)\s*(?:オーナーチェ\S*\s*)?([\d,]+)\s*万円/);
     const years = [...c.matchAll(/((?:19|20)\d{2})\s*年/g)].map(m=>m[1]);
     const bus  = (c.match(/バス\s*(\d+)\s*分/)||["",""])[1];
     const walk = (c.match(/(?:徒歩|停歩)\s*(\d+)\s*分/)||["",""])[1];
 
-    const md = c.match(/(\d+\.\d+)\s*万円\s*(.*?)\s*((?:\d+|地下\d+)階)\s*([0-9][SLDK]{1,4}|ワンルーム)(?!\S)/);
+    const md = c.match(/(\d+\.\d+)\s*万円\s*(.*?)\s*((?:\d+|地下\d+)階)\s*([0-9][SLDK]{1,4}|ワンルーム)(?![A-Z0-9])/);
     const madori = md ? md[4]
-      : ((c.match(/([0-9][SLDK]{1,4}|ワンルーム)(?!\S)/g)||[]).pop() || "");
+      : ((c.match(/([0-9][SLDK]{1,4}|ワンルーム)(?![A-Z0-9])/g)||[]).pop() || "");
     const bname = md ? (md[2].replace(/\s*\d+階$/,"").trim() + " " + md[3]).trim() : "";
 
     rows.push({
-      id: h[1],
+      id: h.id,
       oc: /オーナーチェ/.test(c),
       moushi: /申込あり/.test(c),
       name: townOf(addr),
@@ -825,16 +826,23 @@ async function readReins(input, target){
   try{
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-    let all = [], total = 0;
+    let all = [], total = 0, chars = 0, mode = "";
     for(const f of files){
       const buf = await f.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({data:buf}).promise;
-      let text = "";
+      let lineText = "", flatText = "";
       for(let p=1;p<=pdf.numPages;p++){
         const c = await (await pdf.getPage(p)).getTextContent();
-        text += "\n" + pageText(c.items);
+        lineText += "\n" + pageText(c.items);
+        flatText += c.items.map(i=>i.str).join("");
       }
-      const r = parseReinsText(text);
+      chars += lineText.length;
+      /* まず行を組み直した文字列で、だめなら空白をつめた文字列で読む */
+      let r = parseReinsText(lineText);
+      if(!r.rows.length){
+        r = parseReinsText(flatText.replace(/[ \u3000]/g,""));
+        if(r.rows.length) mode = "（空白をつめて読みました）";
+      }
       total = Math.max(total, r.total);
       all = all.concat(r.rows);
     }
@@ -845,14 +853,18 @@ async function readReins(input, target){
     if(S.excMoushi) rows = rows.filter(r=>!r.moushi);
 
     if(!read){
-      box.textContent = "物件を読み取れませんでした。紙に印刷してスキャンしたPDFだと文字が拾えません。";
+      box.innerHTML = `物件を1件も見つけられませんでした。<br>`
+        + `取り出せた文字数は <b>${chars}</b> 文字です。`
+        + (chars < 50
+            ? "ほぼ0なので、紙に印刷してスキャンしたPDFだと思われます。レインズの画面から「PDFとして保存」で出し直してください。"
+            : "文字は取れているので、表の形が想定と違うようです。このPDFをチャットに送ってください。");
       return;
     }
     S[target] = toTSV(rows);
     if(total && !S.f1) S.f1 = String(total);
     document.querySelector(`textarea[data-k="${target}"]`).value = S[target];
     document.querySelector('input[data-k="f1"]').value = S.f1;
-    box.innerHTML = `検索総数 <b>${total||"—"}</b> 件　／　読み取り <b>${read}</b> 件　／　除外後 <b>${rows.length}</b> 件`;
+    box.innerHTML = `検索総数 <b>${total||"—"}</b> 件　／　読み取り <b>${read}</b> 件　／　除外後 <b>${rows.length}</b> 件 ${mode}`;
     render();
   }catch(e){
     box.textContent = "読み込めませんでした：" + e.message;

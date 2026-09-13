@@ -116,6 +116,14 @@ textarea{min-height:76px;resize:vertical;line-height:1.6;}
 .cover .meta{font-size:12pt;color:var(--sub);margin-top:60px;line-height:2;}
 .cover .logo{margin-top:auto;font-size:16pt;font-weight:800;color:var(--navy);letter-spacing:.1em;}
 
+.cover .photo{margin:26px 0 0;border-radius:6px;overflow:hidden;}
+.cover .photo img{width:100%;height:92mm;object-fit:cover;display:block;}
+.door{display:flex;flex-direction:column;justify-content:center;}
+.door h2{margin:0 0 26px;font-size:24pt;color:var(--navy);text-align:center;letter-spacing:.1em;}
+.door .rule{width:100px;height:5px;background:var(--orange);margin:0 auto 30px;}
+.door img{width:100%;height:150mm;object-fit:cover;border-radius:6px;display:block;}
+.door .cap{margin-top:18px;text-align:center;font-size:12pt;color:var(--sub);}
+
 /* 本文ブロック */
 .quote{
   font-size:17pt;font-weight:800;color:var(--navy);line-height:1.9;
@@ -718,6 +726,21 @@ function parseRows(text){
     if(cut.length > COLS.length) o.cmt = cut.slice(COLS.length-1).join(" ");
     return o;
   });
+}
+
+/* ---------- 表紙の写真 ---------- */
+let COVER = null;
+function probeCover(){
+  const names = ["cover.jpg","cover.jpeg","cover.png"];
+  let i = 0;
+  const tryNext = () => {
+    if(i >= names.length) return;
+    const im = new Image();
+    im.onload = () => { COVER = names[i]; render(); };
+    im.onerror = () => { i++; tryNext(); };
+    im.src = names[i];
+  };
+  tryNext();
 }
 
 /* ---------- 成約データ（funnel-data.json / school-lookup.js） ---------- */
@@ -1468,6 +1491,7 @@ function render(){
   add(p => pageMoney(p, total));
   add(p => pageSim1(p));
   add(p => pageSim2(p));
+  add(p => pageDoor(p));
   add(p => pageProp(0, p));
   add(p => pageAround(0, p));
   addMany(p => pageFull(0, p));
@@ -1494,6 +1518,7 @@ function pageCover(){
     <h1>ご提案書</h1>
     <div class="rule"></div>
     <div class="cname">${esc(S.customer||"お客様名")}<small>様</small></div>
+    ${COVER? `<div class="photo"><img src="${COVER}" alt=""></div>` : ""}
     <div class="meta">${esc(fmtDate(S.date))}<br>担当　${esc(S.staff||"")}</div>
     <div class="logo">${esc(S.company||"")}</div></div>`;
 }
@@ -1742,6 +1767,14 @@ function pageSold(no){
        ${st.noBuilt ? `※ 成約データのうち「築年月」${st.noBuilt}件は記載がなく、築年で絞る場合は集計に含まれていません。<br>` : ""}
        ※ 出典：レインズ成約情報（2021〜2025年・富山市）</p>`);
 }
+function pageDoor(no){
+  if(!COVER) return "";
+  return `<div class="page door"><div class="page-tag">${no}枚目：物件紹介の扉</div>
+    <h2>ご提案物件のご紹介</h2><div class="rule"></div>
+    <img src="${COVER}" alt="">
+    <div class="cap">暮らしに家を合わせる。ViVi不動産のリノベーション</div>
+    <div class="foot"><span>${esc(S.customer||"　")} 様</span><span>${esc(S.company||"")}</span></div></div>`;
+}
 function pageCompare(no){
   const cell = (i)=>{
     const d = P[i], p = n(d.price), r = n(d.reno);
@@ -1791,7 +1824,7 @@ function loadJsonFile(input){
 
 /* ========== 起動 ========== */
 buildPropPanel(0); buildPropPanel(1);
-bind(); render(); setMode("sim"); loadDb();
+bind(); render(); setMode("sim"); loadDb(); probeCover();
 </script>
 </body>
 </html>

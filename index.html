@@ -659,6 +659,8 @@ function buildPropPanel(i){
       : `<input type="${f.t||"text"}" data-p="${i}" data-k="${f.k}" placeholder="${f.ph}">`;
   });
   h += `<label>地図リンクと図面</label>
+    <button class="mini" onclick="findSpots(${i})"><b>周辺施設を探す</b></button>
+    <button class="mini" onclick="autoWalk(${i})">名前から徒歩分数を入れる</button>
     <button class="mini" onclick="mapLinks(${i})">地図リンクを作る</button>
     <button class="mini" onclick="document.getElementById('plan${i}').click()">図面PDFを取り込む</button>
     <input type="file" id="plan${i}" accept="application/pdf" style="display:none" onchange="readPlanPdf(${i},this)">
@@ -749,6 +751,172 @@ function parseRows(text){
   });
 }
 
+/* ---------- Google マップ ---------- */
+const GMAPS_KEY = "AIzaSyApLq7tm4D82xiJfuqO4b2-Ept69hY1THU";
+let gmapsReady = null;
+function loadGmaps(){
+  if(gmapsReady) return gmapsReady;
+  gmapsReady = new Promise((res, rej)=>{
+    if(window.google && window.google.maps) return res();
+    const sc = document.createElement("script");
+    sc.src = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&language=ja&region=JP&libraries=places&v=weekly&loading=async`;
+    sc.onload = ()=>res();
+    sc.onerror = ()=>rej(new Error("地図の読み込みに失敗しました"));
+    document.head.appendChild(sc);
+  });
+  return gmapsReady;
+}
+/* 物件から各施設までの徒歩分数と距離を取る */
+async function autoWalk(i){
+  const d = P[i], box = document.getElementById("maps"+i);
+  const from = (d.addr||"").trim();
+  if(!from){ box.innerHTML = '<p class="hint">先に所在地を入れてください。</p>'; return; }
+
+  const names = [];
+  lines(d.around).forEach(l=>{
+    const nm = l.split(/\t| {2,}|,|、|　/)[0].trim();
+    if(nm) names.push(nm);
+  });
+  [d.station, d.elem, d.junior].forEach(x=>{
+    if(x && x.trim() && !names.includes(x.trim())) names.unshift(x.trim());
+  });
+  if(!names.length){
+    box.innerHTML = '<p class="hint">先に「周辺環境図」に施設名を1行ずつ書くか、駅・小学校・中学校の名前を入れてください。</p>';
+    return;
+  }
+  box.innerHTML = '<p class="hint">徒歩分数を調べています…</p>';
+  try{
+    await loadGmaps();
+    const svc = new google.maps.DistanceMatrixService();
+    const out = [];
+    for(let s0=0; s0<names.length; s0+=20){
+      const part = names.slice(s0, s0+20);
+      const res = await new Promise((ok, ng)=>{
+        svc.getDistanceMatrix({
+          origins:[from],
+          destinations: part.map(x=>x+" 富山県"),
+          travelMode: google.maps.TravelMode.WALKING,
+          unitSystem: google.maps.UnitSystem.METRIC
+        }, (r, st)=> st==="OK" ? ok(r) : ng(new Error(st)));
+      });
+      (res.rows[0].elements||[]).forEach((el, j)=>{
+        if(el.status==="OK"){
+          out.push([part[j], Math.round(el.duration.value/60), el.distance.text.replace(/\s/g,"")]);
+        } else {
+          out.push([part[j], "", ""]);
+        }
+      });
+    }
+    P[i].around = out.map(r=>r.join("\t")).join("\n");
+    const ta = document.querySelector(`textarea[data-p="${i}"][data-k="around"]`);
+    if(ta) ta.value = P[i].around;
+    render();
+    const ng = out.filter(r=>!r[1]).length;
+    box.innerHTML = `${out.length - ng} 件の徒歩分数を入れました。`
+      + (ng ? `<br>${ng} 件は見つかりませんでした。施設名を正式名称にすると見つかりやすくなります。` : "");
+  }catch(e){
+    box.innerHTML = "取得できませんでした：" + e.message
+      + '<br>Google Cloud の鍵の設定で <b>Maps JavaScript API</b> が許可されているか確認してください。';
+  }
+}
+
+/* 施設の種類と探す範囲（学校と駅は遠くても最寄りを必ず出す） */
+const SPOTS = [
+  {key:"super",  label:"スーパー",       types:["supermarket"],                  r:1500, take:3},
+  {key:"conv",   label:"コンビニ",       types:["convenience_store"],            r:1200, take:2},
+  {key:"drug",   label:"ドラッグストア", types:["drugstore","pharmacy"],         r:1500, take:2},
+  {key:"hosp",   label:"病院・クリニック", types:["hospital","doctor"],          r:2000, take:2},
+  {key:"park",   label:"公園",           types:["park"],                         r:1200, take:2},
+  {key:"sho",    label:"小学校",         types:["primary_school","school"],      r:6000, take:2, name:/小学校/},
+  {key:"chu",    label:"中学校",         types:["secondary_school","school"],    r:8000, take:2, name:/中学校/},
+  {key:"sta",    label:"駅",             types:["train_station","light_rail_station","subway_station"], r:6000, take:2}
+];
+let FOUND = [[],[]];
+
+async function findSpots(i){
+  const d = P[i], box = document.getElementById("maps"+i);
+  const from = (d.addr||"").trim();
+  if(!from){ box.innerHTML = '<p class="hint">先に所在地を入れてください。</p>'; return; }
+  box.innerHTML = '<p class="hint">周辺の施設を探しています…</p>';
+  try{
+    await loadGmaps();
+    const {Place, SearchNearbyRankPreference} = await google.maps.importLibrary("places");
+    const {Geocoder} = await google.maps.importLibrary("geocoding");
+
+    const geo = await new Promise((ok, ng)=>{
+      new Geocoder().geocode({address: from, region:"jp"}, (r, st)=>
+        st==="OK" && r[0] ? ok(r[0].geometry.location) : ng(new Error("住所が見つかりません：" + st)));
+    });
+
+    const cand = [];
+    for(const sp of SPOTS){
+      try{
+        const {places} = await Place.searchNearby({
+          fields:["displayName","location"],
+          locationRestriction:{center: geo, radius: sp.r},
+          includedPrimaryTypes: sp.types,
+          maxResultCount: 8,
+          rankPreference: SearchNearbyRankPreference.DISTANCE,
+          language:"ja", region:"jp"
+        });
+        let list = places || [];
+        if(sp.name) list = list.filter(pl=>sp.name.test(pl.displayName||""));
+        list.slice(0, sp.take).forEach(pl=>
+          cand.push({cat: sp.label, nm: pl.displayName, loc: pl.location}));
+      }catch(e){ /* 見つからない種類は飛ばす */ }
+    }
+    if(!cand.length){ box.innerHTML = "周辺に施設が見つかりませんでした。所在地の書き方を変えてみてください。"; return; }
+
+    /* 徒歩分数をまとめて取る */
+    const svc = new google.maps.DistanceMatrixService();
+    for(let s0=0; s0<cand.length; s0+=20){
+      const part = cand.slice(s0, s0+20);
+      const res = await new Promise((ok, ng)=>{
+        svc.getDistanceMatrix({
+          origins:[from], destinations: part.map(x=>x.loc),
+          travelMode: google.maps.TravelMode.WALKING,
+          unitSystem: google.maps.UnitSystem.METRIC
+        }, (r, st)=> st==="OK" ? ok(r) : ng(new Error(st)));
+      });
+      (res.rows[0].elements||[]).forEach((el, j)=>{
+        if(el.status==="OK"){
+          part[j].min = Math.round(el.duration.value/60);
+          part[j].dist = el.distance.text.replace(/\s/g,"");
+        }
+      });
+    }
+    FOUND[i] = cand.filter(x=>x.min!==undefined).sort((a,b)=>a.min-b.min);
+    drawSpots(i);
+  }catch(e){
+    box.innerHTML = "探せませんでした：" + e.message
+      + '<br>鍵の設定で <b>Places API (New)</b> と <b>Maps JavaScript API</b> が許可されているか確認してください。';
+  }
+}
+function drawSpots(i){
+  const box = document.getElementById("maps"+i);
+  const cur = lines(P[i].around).map(l=>l.split(/\t| {2,}/)[0].trim());
+  box.innerHTML = `<p class="hint">載せたい施設にチェックを入れてください。徒歩の近い順です。</p>
+    <div class="picker" style="max-height:260px">` +
+    FOUND[i].map((x,j)=>`<label><input type="checkbox" ${cur.includes(x.nm)?"checked":""}
+        onchange="pickSpot(${i},${j},this.checked)">
+        <span style="flex:1">${esc(x.nm)}<span class="sub2" style="color:var(--sub);font-size:12px"> ${esc(x.cat)}</span></span>
+        <span class="cnt">徒歩${x.min}分 ${esc(x.dist||"")}</span></label>`).join("")
+    + `</div>`;
+}
+function pickSpot(i, j, on){
+  const x = FOUND[i][j];
+  let rows = lines(P[i].around).map(l=>l.split(/\t| {2,}|,|、|　/).map(v=>v.trim()));
+  if(on){
+    if(!rows.some(r=>r[0]===x.nm)) rows.push([x.nm, String(x.min), x.dist||""]);
+  } else {
+    rows = rows.filter(r=>r[0]!==x.nm);
+  }
+  P[i].around = rows.map(r=>r.join("\t")).join("\n");
+  const ta = document.querySelector(`textarea[data-p="${i}"][data-k="around"]`);
+  if(ta) ta.value = P[i].around;
+  render();
+}
+
 /* ---------- 小学校区 ---------- */
 /* 成約件数の多い順。よく使う校区を先頭に固定したいときは PINNED に書く */
 const PINNED = ["芝園","中央","柳町","西田地方","堀川","光陽","奥田","奥田北","堀川南","藤ノ木",
@@ -779,13 +947,24 @@ function togglePick(key, name, on){
   S[key] = a.join(",");
   render();
 }
+function schoolCounts(){
+  if(!DB) return null;
+  const recs = sdRecs(), c = {};
+  recs.forEach(r=>{
+    const a = r.school_confident ? [r.school] : (Array.isArray(r.school) ? r.school : []);
+    a.forEach(x=>{ if(x) c[x] = (c[x]||0)+1; });
+  });
+  return c;
+}
 function drawPicker(id, key){
   const box = document.getElementById(id);
   if(!box) return;
   const {pin, rest} = schoolList();
   const cur = pickedList(key);
+  const cnt = schoolCounts();
   const row = x => `<label><input type="checkbox" ${cur.includes(x)?"checked":""}
-      onchange="togglePick('${key}','${x}',this.checked)">${x}小学校</label>`;
+      onchange="togglePick('${key}','${x}',this.checked)">${x}小学校${
+      cnt ? `<span class="cnt" style="${cnt[x]?"":"color:#C0C6D0"}">${cnt[x]||0}</span>` : ""}</label>`;
   box.innerHTML = (pin.length ? `<div class="grp">よく使う校区</div>` + pin.map(row).join("") : "")
     + `<div class="grp">そのほか（五十音順）</div>` + rest.map(row).join("");
 }
@@ -1048,10 +1227,13 @@ function balance(principal, ratePct, years, months){
 function simKariire(){
   const yrs = n(S.years)||35;
   const kachin = n(S.sim_rent)+n(S.sim_kyoueki)+n(S.sim_park);
-  const nenshu = ((n(S.sim_income)+n(S.sim_income2))/12)*(n(S.sim_ratio)/100) - n(S.sim_exist)/12;
+  const total = n(S.sim_income)+n(S.sim_income2);
+  const nenshu = (total/12)*(n(S.sim_ratio)/100) - n(S.sim_exist)/12;
+  const tekisei = (total/12)*0.20 - n(S.sim_exist)/12;   /* 年収の20%が適正の目安 */
   return {
     rent:   pv(n(S.rate), yrs, kachin),
     income: pv(n(S.sim_shinsa), yrs, nenshu),
+    tekisei: pv(n(S.rate), yrs, tekisei),
     hope:   pv(n(S.rate), yrs, n(S.month)+n(S.bonus)/12)
   };
 }
@@ -1433,9 +1615,11 @@ function pageList(title, sub, text, startNo, tag){
 
 function pageSim1(no){
   const k = simKariire();
+  const nen = n(S.sim_income)+n(S.sim_income2);
   const vals = [
     {v:k.rent,   cap:"今の家賃と同じなら", sub:`月 ${n(S.sim_rent)+n(S.sim_kyoueki)+n(S.sim_park)||"—"} 万円`},
-    {v:k.income, cap:"ご年収の基準では",   sub:`審査金利 ${S.sim_shinsa||"—"}％・負担率 ${S.sim_ratio||"—"}％`},
+    {v:k.income, cap:"審査の基準では",     sub:`負担率 ${S.sim_ratio||"—"}％・審査金利 ${S.sim_shinsa||"—"}％`},
+    {v:k.tekisei,cap:"ご年収の20％なら",   sub:`無理のない目安　月 ${nen? (nen*0.2/12).toFixed(1):"—"} 万円`},
     {v:k.hope,   cap:"ご希望の返済額なら", sub:`月 ${S.month||"—"} 万円`}
   ];
   if(!vals.some(x=>x.v>0)) return "";
@@ -1529,9 +1713,10 @@ function render(){
 
   const k = simKariire();
   const use = (v) => `<button class="mini" onclick="S.loan='${Math.round(v)}';syncInputs();render()">これを使う</button>`;
-  document.getElementById("simBox1").innerHTML = (k.rent+k.income+k.hope) > 0 ? `
+  document.getElementById("simBox1").innerHTML = (k.rent+k.income+k.tekisei+k.hope) > 0 ? `
     今の家賃と同じなら <b>${man(Math.round(k.rent))}</b> 万円 ${k.rent>0?use(k.rent):""}<br>
-    ご年収の基準では <b>${man(Math.round(k.income))}</b> 万円 ${k.income>0?use(k.income):""}<br>
+    審査の基準では <b>${man(Math.round(k.income))}</b> 万円 ${k.income>0?use(k.income):""}<br>
+    ご年収の20％なら <b>${man(Math.round(k.tekisei))}</b> 万円 ${k.tekisei>0?use(k.tekisei):""}<br>
     ご希望の返済額なら <b>${man(Math.round(k.hope))}</b> 万円 ${k.hope>0?use(k.hope):""}`
     : "家賃・年収・ご希望の返済額のどれかを入れてください";
 

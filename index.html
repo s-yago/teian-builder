@@ -759,7 +759,7 @@ function loadGmaps(){
   gmapsReady = new Promise((res, rej)=>{
     if(window.google && window.google.maps) return res();
     const sc = document.createElement("script");
-    sc.src = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&language=ja&region=JP&libraries=places&v=weekly&loading=async`;
+    sc.src = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&language=ja&region=JP&libraries=places&v=weekly`;
     sc.onload = ()=>res();
     sc.onerror = ()=>rej(new Error("地図の読み込みに失敗しました"));
     document.head.appendChild(sc);
@@ -840,11 +840,13 @@ async function findSpots(i){
   box.innerHTML = '<p class="hint">周辺の施設を探しています…</p>';
   try{
     await loadGmaps();
-    const {Place, SearchNearbyRankPreference} = await google.maps.importLibrary("places");
-    const {Geocoder} = await google.maps.importLibrary("geocoding");
+    if(!(google.maps.places && google.maps.places.Place))
+      throw new Error("地図の部品がそろっていません。ページを再読み込み（Ctrl+F5）してからもう一度お試しください");
+    const Place = google.maps.places.Place;
+    const RANK = google.maps.places.SearchNearbyRankPreference;
 
     const geo = await new Promise((ok, ng)=>{
-      new Geocoder().geocode({address: from, region:"jp"}, (r, st)=>
+      new google.maps.Geocoder().geocode({address: from, region:"jp"}, (r, st)=>
         st==="OK" && r[0] ? ok(r[0].geometry.location) : ng(new Error("住所が見つかりません：" + st)));
     });
 
@@ -856,7 +858,7 @@ async function findSpots(i){
           locationRestriction:{center: geo, radius: sp.r},
           includedPrimaryTypes: sp.types,
           maxResultCount: 8,
-          rankPreference: SearchNearbyRankPreference.DISTANCE,
+          rankPreference: RANK ? RANK.DISTANCE : "DISTANCE",
           language:"ja", region:"jp"
         });
         let list = places || [];

@@ -660,6 +660,7 @@ function buildPropPanel(i){
   });
   h += `<label>地図リンクと図面</label>
     <button class="mini" onclick="findSpots(${i})"><b>周辺施設を探す</b></button>
+    <button class="mini" onclick="makeMap(${i})"><b>地図を取り込む</b></button>
     <button class="mini" onclick="autoWalk(${i})">名前から徒歩分数を入れる</button>
     <button class="mini" onclick="mapLinks(${i})">地図リンクを作る</button>
     <button class="mini" onclick="document.getElementById('plan${i}').click()">図面PDFを取り込む</button>
@@ -892,6 +893,55 @@ async function findSpots(i){
   }catch(e){
     box.innerHTML = "探せませんでした：" + e.message
       + '<br>鍵の設定で <b>Places API (New)</b> と <b>Maps JavaScript API</b> が許可されているか確認してください。';
+  }
+}
+/* 物件と選んだ施設を地図画像にする */
+async function makeMap(i){
+  const d = P[i], box = document.getElementById("maps"+i);
+  const from = (d.addr||"").trim();
+  if(!from){ box.innerHTML = '<p class="hint">先に所在地を入れてください。</p>'; return; }
+  box.innerHTML = '<p class="hint">地図を作っています…</p>';
+  try{
+    await loadGmaps();
+    const geo = await new Promise((ok, ng)=>{
+      new google.maps.Geocoder().geocode({address: from, region:"jp"}, (r, st)=>
+        st==="OK" && r[0] ? ok(r[0].geometry.location) : ng(new Error("住所が見つかりません：" + st)));
+    });
+    const c = geo.lat() + "," + geo.lng();
+
+    /* 選んだ施設にも印を付ける */
+    const picked = lines(d.around).map(l=>l.split(/\t| {2,}|,|、|　/)[0].trim()).filter(Boolean);
+    const spots = (FOUND[i]||[]).filter(x=>picked.includes(x.nm)).slice(0,12);
+    const pins = spots.map(x=>`&markers=size:small%7Ccolor:0xE07B1E%7C${x.loc.lat()},${x.loc.lng()}`).join("");
+
+    const base = "https://maps.googleapis.com/maps/api/staticmap";
+    const shots = [
+      {z:16, cap:"物件の周辺"},
+      {z:14, cap:"広域からの位置"}
+    ];
+    for(const sh of shots){
+      const url = `${base}?center=${c}&zoom=${sh.z}&size=640x480&scale=2&language=ja&region=JP`
+        + `&markers=size:mid%7Ccolor:0x16294B%7Clabel:P%7C${c}` + (sh.z>=16 ? pins : "")
+        + `&key=${GMAPS_KEY}`;
+      const dataUrl = await new Promise((ok, ng)=>{
+        const im = new Image();
+        im.crossOrigin = "anonymous";
+        im.onload = ()=>{
+          const cv = document.createElement("canvas");
+          cv.width = im.width; cv.height = im.height;
+          cv.getContext("2d").drawImage(im, 0, 0);
+          ok(cv.toDataURL("image/jpeg", 0.85));
+        };
+        im.onerror = ()=>ng(new Error("地図画像を取得できません"));
+        im.src = url;
+      });
+      P[i].imgs.push({src:dataUrl, cap:sh.cap, full:false});
+    }
+    renderImgList(i); render();
+    box.innerHTML = "地図を2枚（周辺・広域）取り込みました。画像一覧から差し替えや削除ができます。";
+  }catch(e){
+    box.innerHTML = "地図を作れませんでした：" + e.message
+      + '<br>鍵の設定で <b>Maps Static API</b> が許可されているか確認してください。';
   }
 }
 function drawSpots(i){

@@ -253,16 +253,16 @@ body.mode-sim .page:not(.scope-sim){display:none;}
 .around .spot .mn small{font-size:10pt;color:var(--sub);font-weight:700;margin-left:4px;}
 
 /* シミュレーション表示 */
-.bars{display:flex;align-items:flex-end;gap:24px;height:105mm;margin:18px 10mm 0;}
+.bars{display:flex;align-items:flex-end;gap:12px;height:100mm;margin:16px 6mm 0;}
 .bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
-.bar .amt{font-size:22pt;font-weight:800;color:var(--navy);margin-bottom:6px;white-space:nowrap;}
+.bar .amt{font-size:19pt;font-weight:800;color:var(--navy);margin-bottom:6px;white-space:nowrap;}
 .bar .amt small{font-size:12pt;}
 .bar .col{width:100%;background:var(--navy-soft);border-radius:4px 4px 0 0;min-height:4px;}
 .bar.hi .col{background:var(--orange);}
-.bar.hi .amt{color:var(--orange);font-size:26pt;}
-.bar .cap{margin-top:10px;font-size:12pt;font-weight:700;color:var(--ink);text-align:center;line-height:1.4;}
+.bar.hi .amt{color:var(--orange);font-size:23pt;}
+.bar .cap{margin-top:10px;font-size:11pt;font-weight:700;color:var(--ink);text-align:center;line-height:1.4;}
 .bar .sub2{font-size:10.5pt;color:var(--sub);font-weight:500;}
-.baseline{border-top:2px solid var(--navy);margin:0 10mm;}
+.baseline{border-top:2px solid var(--navy);margin:0 6mm;}
 .simnote{
   margin:24px 0 0;border:3px solid var(--navy);border-radius:8px;padding:16px 20px;font-size:13pt;line-height:1.9;}
 .simnote b{font-size:20pt;color:var(--orange);}
@@ -306,6 +306,11 @@ body.mode-sim .page:not(.scope-sim){display:none;}
 /* ====== 印刷 ====== */
 @media print{
   @page{size:A4 portrait;margin:0;}
+  *, *::before, *::after{
+    -webkit-print-color-adjust:exact !important;
+    print-color-adjust:exact !important;
+    color-adjust:exact !important;
+  }
   body{background:#fff;font-size:12pt;}
   .panel,.page-tag,.stage-note{display:none !important;}
   .wrap{display:block;}
@@ -1667,6 +1672,31 @@ function pageList(title, sub, text, startNo, tag){
   return pages;
 }
 
+function pageLife(no){
+  if(S.lp_zansai==="" && S.lp_diff==="") return "";
+  const yr = S.lp_after || "数";
+  return shell(no+"枚目：今買う場合との比較","",
+    head("今ご購入する場合と、先に延ばす場合", `${esc(yr)}年後と比べています`) +
+    `<table class="breakdown" style="margin-top:10px">
+      <tr><th style="width:40%">　</th>
+        <th style="background:var(--orange);color:#fff;text-align:center">今ご購入する場合</th>
+        <th style="background:#6B7A93;color:#fff;text-align:center">${esc(yr)}年後にご購入する場合</th></tr>
+      <tr><th>住居費の総額</th>
+        <td style="text-align:center">${man(S.lp_now)} 万円</td>
+        <td style="text-align:center">${man(S.lp_future)} 万円</td></tr>
+      <tr><th>65歳時のローン残債</th>
+        <td style="text-align:center;font-size:18pt;color:var(--navy)">${man(S.lp_zansai)} 万円</td>
+        <td style="text-align:center;font-size:18pt;color:#D0021B">${man(S.lp_zansai_f)} 万円</td></tr>
+      <tr class="total"><th>先に延ばした場合の差</th>
+        <td colspan="2" style="text-align:center">${man(S.lp_diff)} 万円</td></tr>
+    </table>
+    <div class="simnote" style="text-align:center;margin-top:24px">
+      1日あたりに換算すると <b>${S.lp_day? Math.abs(n(S.lp_day)).toLocaleString("ja-JP"):"—"}</b> 円です
+    </div>
+    <p class="legend-note" style="margin-top:18px">
+      ※ 65歳時のローン残債は、お借入の元金の残りです。<br>
+      ※ 記載の金額は試算であり、将来の金利や物件価格を保証するものではありません。</p>`);
+}
 function pageSim1(no){
   const k = simKariire();
   const nen = n(S.sim_income)+n(S.sim_income2);
@@ -1687,7 +1717,7 @@ function pageSim1(no){
     </div>`).join("");
 
   return shell(no+"枚目：借入可能額","scope-sim",
-    head("いくらお借りになれるか", "3つの基準で試算しました") +
+    head("いくらお借りになれるか", "4つの基準で試算しました") +
     `<div class="bars">${bars}</div><div class="baseline"></div>
      <div class="simnote">
        ご希望の月々 ${esc(S.month||"—")} 万円でご返済される場合、お借入は
@@ -1804,6 +1834,7 @@ function render(){
   if(S.useDb) add(p => pageSold(p));
   if(S.useSold) addMany(p => pageList("このエリアの成約事例", "実際に売買が成立した価格です", S.soldData, p, "成約事例"));
   add(p => pageMoney(p, total));
+  add(p => pageLife(p));
   add(p => pageSim1(p));
   add(p => pageSim2(p));
   add(p => pageDoor(p));
@@ -1919,24 +1950,7 @@ function pageMoney(no, total){
     金利 ${esc(S.rate||"—")}％／返済期間 ${esc(S.years||"—")}年${n(S.bonus)?"／ボーナス返済 "+S.bonus+"万円（年額）":"／ボーナス返済なし"}
     <br>※金利は試算時点のものです。実際のご融資条件は金融機関の審査により決定します。</p>`;
 
-  let lp = "";
-  if(S.lp_zansai!=="" || S.lp_diff!==""){
-    const yr = S.lp_after || "数";
-    lp = `<table class="breakdown" style="margin-top:20px">
-      <tr><th style="width:40%">　</th>
-        <th style="background:var(--navy);color:#fff;text-align:center">今ご購入する場合</th>
-        <th style="background:#6B7A93;color:#fff;text-align:center">${esc(yr)}年後にご購入する場合</th></tr>
-      <tr><th>住居費の総額</th><td style="text-align:center">${man(S.lp_now)} 万円</td>
-        <td style="text-align:center">${man(S.lp_future)} 万円</td></tr>
-      <tr><th>65歳時のローン残債</th>
-        <td style="text-align:center;font-size:16pt;color:var(--navy)">${man(S.lp_zansai)} 万円</td>
-        <td style="text-align:center;font-size:16pt;color:#D0021B">${man(S.lp_zansai_f)} 万円</td></tr>
-      <tr class="total"><th>先に延ばした場合の差</th>
-        <td colspan="2" style="text-align:center">${man(S.lp_diff)} 万円　（1日あたり ${S.lp_day? n(S.lp_day).toLocaleString("ja-JP"):"—"} 円）</td></tr>
-    </table>`;
-  }
-
-  return shell(no+"枚目：資金計画","", head("資金計画","無理なくご返済いただける計画です") + money + t + cond + lp);
+  return shell(no+"枚目：資金計画","", head("資金計画","無理なくご返済いただける計画です") + money + t + cond);
 }
 function pageProp(i, no){
   const d = P[i], p = n(d.price), r = n(d.reno);

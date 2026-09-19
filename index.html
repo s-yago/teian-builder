@@ -852,13 +852,72 @@ async function runSurvey(i, force){
     syncProp(i);
     await drawSurveyMap(i, rows);
     render();
-
-    const warn = (r.origin && r.origin.rough) ? "　※住所は番地から推定した位置です" : "";
-    box.innerHTML = `${esc(from)}の結果を反映しました（施設${rows.length}件・地図1枚）${warn}`
-      + `<br><button class="mini" onclick="runSurvey(${i}, true)">調べ直す</button>`;
+    drawSpots(i, from);
   }catch(e){
     box.innerHTML = "調べられませんでした：" + esc(e.message||String(e));
   }
+}
+/* 調べた候補をチェックボックスで並べる */
+function spotList(i){
+  const r = P[i].survey;
+  if(!r) return [];
+  const out = [];
+  if(r.sho) out.push({...r.sho, catLabel:"小学校"});
+  if(r.chu) out.push({...r.chu, catLabel:"中学校"});
+  (r.stations||[]).forEach(x=>out.push({...x, catLabel:"駅"}));
+  (r.buses||[]).slice(0,3).forEach(x=>out.push({...x, catLabel:"バス停"}));
+  (r.facilities||[]).forEach(x=>out.push(x));
+  return out.filter(x=>x.name && x.mins!==undefined);
+}
+function spotLabel(x){
+  const ln = x.catLabel==="駅" && x.line ? x.line.split("／")[0]+" " : "";
+  return ln + x.name;
+}
+function drawSpots(i, from){
+  const box = document.getElementById("maps"+i);
+  const list = spotList(i);
+  if(!list.length){ box.innerHTML = "候補が見つかりませんでした。"; return; }
+  const cur = lines(P[i].around).map(l=>l.split(/\t| {2,}/)[0].trim());
+  const rough = (P[i].survey.origin && P[i].survey.origin.rough)
+    ? '<p class="hint" style="color:#D0021B">※住所は番地から推定した位置です。地図のピンがずれていないか確認してください。</p>' : "";
+  const gk = P[i].survey.gakku;
+  const many = gk && gk.hits && [...new Set(gk.hits.map(h=>h.e))].length > 1;
+  const caution = (many || (gk && gk.hits && gk.hits.some(h=>h.caution)))
+    ? '<p class="hint" style="color:#D0021B;font-weight:700">※この町名は番地により校区が分かれます。提案書にもその旨を記載します。</p>' : "";
+
+  box.innerHTML = `<p class="hint">${esc(from||"")}の結果です。提案書に載せる施設にチェックを入れてください（8件まで）。</p>`
+    + rough + caution
+    + `<div class="picker" style="max-height:280px">` + list.map((x,j)=>`
+        <label><input type="checkbox" ${cur.includes(spotLabel(x))?"checked":""}
+          onchange="pickSpot(${i},${j},this.checked)">
+          <span style="flex:1">${esc(spotLabel(x))}<span style="color:var(--sub);font-size:12px"> ${esc(x.catLabel||"")}</span></span>
+          <span class="cnt">徒歩${x.mins}分 ${esc(fmtM(x.m))}</span></label>`).join("")
+    + `</div>
+       <button class="mini" onclick="redrawMap(${i})">選んだ施設で地図を作り直す</button>
+       <button class="mini" onclick="runSurvey(${i}, true)">調べ直す</button>`;
+}
+function pickSpot(i, j, on){
+  const x = spotList(i)[j];
+  const nm = spotLabel(x);
+  let rows = lines(P[i].around).map(l=>l.split(/\t| {2,}|,|、|　/).map(v=>v.trim()));
+  if(on){
+    if(rows.length >= 8){ alert("提案書に載せられるのは8件までです。どれかのチェックを外してください。"); drawSpots(i); return; }
+    if(!rows.some(v=>v[0]===nm)) rows.push([nm, String(x.mins), fmtM(x.m)]);
+  } else {
+    rows = rows.filter(v=>v[0]!==nm);
+  }
+  P[i].around = rows.map(v=>v.join("\t")).join("\n");
+  const ta = document.querySelector(`textarea[data-p="${i}"][data-k="around"]`);
+  if(ta) ta.value = P[i].around;
+  render();
+}
+async function redrawMap(i){
+  const box = document.getElementById("maps"+i);
+  const keep = box.innerHTML;
+  box.innerHTML = '<p class="hint">地図を作り直しています…</p>';
+  const rows = lines(P[i].around).map(l=>l.split(/\t| {2,}/).map(v=>v.trim()));
+  try{ await drawSurveyMap(i, rows); render(); }catch(e){}
+  drawSpots(i);
 }
 function fmtM(m){ return m>=1000 ? (m/1000).toFixed(1)+"km" : Math.round(m)+"m"; }
 function syncProp(i){
@@ -873,10 +932,10 @@ async function drawSurveyMap(i, rows){
   if(!r || typeof renderShuhenMap !== "function") return;
   const names = rows.map(x=>x[0]);
   const pts = [{lat:r.origin.lat, lng:r.origin.lng, name:"ご提案物件", kind:"prop"}];
-  const all = [r.sho, r.chu, ...(r.stations||[]).slice(0,1), ...(r.facilities||[])].filter(Boolean);
   let n = 0;
-  all.forEach(f=>{
-    if(!names.includes(f.name) || !f.lat) return;
+  spotList(i).forEach(f=>{
+    const nm = spotLabel(f);
+    if(!names.includes(nm) || !f.lat) return;
     pts.push({lat:f.lat, lng:f.lng, name:f.name, kind:"fac", n:++n});
   });
   const cv = await renderShuhenMap({points:pts, w:1240, h:1600, labels:true, fontSize:24});
@@ -1862,7 +1921,10 @@ function pageProp(i, no){
     ["前面道路", d.road], ["通学先", d.school], ["周辺施設", d.life]
   ];
   const sc = schoolOf(d.addr);
-  if(sc) spec.splice(7, 0, ["校区", sc.label + (sc.chu ? `／${sc.chu}中学校` : "")]);
+  if(sc){
+    const chu = sc.chu ? `／${sc.chu}${/学園|義務教育/.test(sc.chu)?"":"中学校"}` : "";
+    spec.splice(7, 0, ["校区", sc.label + chu]);
+  }
   let t = `<table class="spec">`;
   spec.forEach(([l,v])=> t += `<tr><th>${l}</th><td>${v? esc(v) : '<span class="empty">—</span>'}</td></tr>`);
   t += `<tr><th>リノベ概算</th><td>${man(r)} 万円</td></tr>

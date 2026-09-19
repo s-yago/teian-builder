@@ -6,6 +6,7 @@
 <title>案内前 提案書ビルダー ｜ ViVi不動産</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="/shuhen-chosa/shuhen-core.js"></script>
 <style>
 :root{
   --navy:#16294B;
@@ -472,7 +473,7 @@ body.mode-sim .page:not(.scope-sim){display:none;}
     <div class="calc" id="dbBox">データを読み込んでいます…</div>
     <button class="mini" id="dbPick" style="display:none"
       onclick="document.getElementById('dbFiles').click()">データファイルを選ぶ</button>
-    <input type="file" id="dbFiles" multiple accept=".json,.js" style="display:none" onchange="loadDbFiles(this)">
+    <input type="file" id="dbFiles" multiple accept=".json" style="display:none" onchange="loadDbFiles(this)">
 
     <div class="toggle"><input type="checkbox" data-k="useDb"><span>成約データのページを載せる</span></div>
     <div class="row">
@@ -644,6 +645,10 @@ const propFields = [
   {k:"junior", l:"中学校の名前（地図用）", ph:"富山市立堀川中学校"},
   {k:"school", l:"小学校・中学校（提案書に出る文）", ph:"堀川小学校 徒歩10分／堀川中学校 徒歩11分"},
   {k:"life", l:"周辺施設", ph:"スーパー450m／コンビニ450m／ドラッグストア500m"},
+  {k:"youto", l:"用途地域", ph:"第一種低層住居専用地域"},
+  {k:"kenpei", l:"建ぺい率（％）", ph:"60"},
+  {k:"yoseki", l:"容積率（％）", ph:"200"},
+  {k:"toshiku", l:"区域区分", ph:"市街化区域"},
   {k:"around", l:"周辺環境図（1行1施設：名前 分 距離）", t:"area",
    ph:"パルコープ西くずは店\t6\t450m\nローソン南船橋店\t7\t450m\n樟葉西小学校\t10\t700m\n楠葉西中学校\t11\t750m\n樟葉駅\t18\t1.3km"},
   {k:"merit", l:"メリット（1行1つ）", t:"area", ph:"人気の角地物件\n各居室2面採光\n南向きで陽当たり良好\nこだわりリノベが可能"},
@@ -663,14 +668,11 @@ function buildPropPanel(i){
       ? `<textarea data-p="${i}" data-k="${f.k}" placeholder="${f.ph}"></textarea>`
       : `<input type="${f.t||"text"}" data-p="${i}" data-k="${f.k}" placeholder="${f.ph}">`;
   });
-  h += `<label>周辺情報（この順に押してください）</label>
-    <p class="hint">所在地を入れてから、①→②→③ の順に押すだけです。</p>
-    <button class="mini" onclick="findSpots(${i})"><b>① 周辺施設を探す</b></button>
-    <button class="mini" onclick="makeMap(${i})"><b>② 地図を取り込む</b></button>
-    <button class="mini" onclick="document.getElementById('plan${i}').click()"><b>③ 図面PDFを取り込む</b></button>
-    <p class="hint" style="margin-top:10px">うまく出ないときだけ使う補助機能です。</p>
-    <button class="mini" onclick="autoWalk(${i})">名前を打って徒歩分数を入れる</button>
-    <button class="mini" onclick="mapLinks(${i})">地図リンクを開く</button>
+  h += `<label>周辺環境と図面</label>
+    <p class="hint">所在地を入れて押すだけです。学区・最寄り駅・周辺施設・用途地域・地図がまとめて入ります。<br>
+      周辺環境調査シートで同じ住所を調べてあれば、その結果を引き継ぎます。</p>
+    <button class="mini" onclick="runSurvey(${i})"><b>周辺環境を調べる</b></button>
+    <button class="mini" onclick="document.getElementById('plan${i}').click()"><b>図面PDFを取り込む</b></button>
     <input type="file" id="plan${i}" accept="application/pdf" style="display:none" onchange="readPlanPdf(${i},this)">
     <div id="maps${i}"></div>
     <label>画像（外観・間取り・地図・周辺情報）</label>
@@ -759,221 +761,121 @@ function parseRows(text){
   });
 }
 
-/* ---------- Google マップ ---------- */
+/* ---------- 周辺環境（共通部品 shuhen-core.js を使う） ---------- */
 const GMAPS_KEY = "AIzaSyApLq7tm4D82xiJfuqO4b2-Ept69hY1THU";
-let gmapsReady = null;
-function loadGmaps(){
-  if(gmapsReady) return gmapsReady;
-  gmapsReady = new Promise((res, rej)=>{
-    if(window.google && window.google.maps) return res();
-    const sc = document.createElement("script");
-    sc.src = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&language=ja&region=JP&libraries=places&v=weekly`;
-    sc.onload = ()=>res();
-    sc.onerror = ()=>rej(new Error("地図の読み込みに失敗しました"));
-    document.head.appendChild(sc);
-  });
-  return gmapsReady;
+function gkey(){
+  try{ return localStorage.getItem("vivi_gmaps_key") || GMAPS_KEY; }catch(e){ return GMAPS_KEY; }
 }
-/* 物件から各施設までの徒歩分数と距離を取る */
-async function autoWalk(i){
-  const d = P[i], box = document.getElementById("maps"+i);
-  const from = (d.addr||"").trim();
-  if(!from){ box.innerHTML = '<p class="hint">先に所在地を入れてください。</p>'; return; }
+function normKey(a){ return String(a||"").replace(/\s|　/g,"").replace(/富山県|富山市/g,""); }
 
-  const names = [];
-  lines(d.around).forEach(l=>{
-    const nm = l.split(/\t| {2,}|,|、|　/)[0].trim();
-    if(nm) names.push(nm);
-  });
-  [d.station, d.elem, d.junior].forEach(x=>{
-    if(x && x.trim() && !names.includes(x.trim())) names.unshift(x.trim());
-  });
-  if(!names.length){
-    box.innerHTML = '<p class="hint">先に「周辺環境図」に施設名を1行ずつ書くか、駅・小学校・中学校の名前を入れてください。</p>';
+/* 調査シートの結果と、自分で調べた結果を同じ棚に置いて使い回す */
+function cacheGet(addr){
+  try{
+    const k = normKey(addr);
+    const hand = JSON.parse(localStorage.getItem("vivi_shuhen_result")||"null");
+    if(hand && normKey(hand.addr)===k && hand.data) return {src:"調査シート", data:hand.data};
+    const c = JSON.parse(localStorage.getItem("vivi_shuhen_cache")||"{}");
+    if(c[k]) return {src:"前回の調査", data:c[k].data};
+  }catch(e){}
+  return null;
+}
+function cacheSet(addr, data){
+  try{
+    const c = JSON.parse(localStorage.getItem("vivi_shuhen_cache")||"{}");
+    c[normKey(addr)] = {savedAt: Date.now(), data};
+    const ks = Object.keys(c);
+    if(ks.length > 30) delete c[ks[0]];
+    localStorage.setItem("vivi_shuhen_cache", JSON.stringify(c));
+  }catch(e){}
+}
+
+/* 調査 → 物件情報・周辺施設・地図までまとめて入れる */
+async function runSurvey(i, force){
+  const d = P[i], box = document.getElementById("maps"+i);
+  const addr = (d.addr||"").trim();
+  if(!addr){ box.innerHTML = '<p class="hint">先に所在地を入れてください。</p>'; return; }
+  if(typeof surveyAddress !== "function"){
+    box.innerHTML = '共通部品を読み込めていません。<br>'
+      + '<b>/shuhen-chosa/shuhen-core.js</b> が同じサイト内にあるか確認してください。';
     return;
   }
-  box.innerHTML = '<p class="hint">徒歩分数を調べています…</p>';
+  let from = "", r = null;
+  const hit = force ? null : cacheGet(addr);
+  if(hit){ r = hit.data; from = hit.src; }
+
   try{
-    await loadGmaps();
-    const svc = new google.maps.DistanceMatrixService();
-    const out = [];
-    for(let s0=0; s0<names.length; s0+=20){
-      const part = names.slice(s0, s0+20);
-      const res = await new Promise((ok, ng)=>{
-        svc.getDistanceMatrix({
-          origins:[from],
-          destinations: part.map(x=>x+" 富山県"),
-          travelMode: google.maps.TravelMode.WALKING,
-          unitSystem: google.maps.UnitSystem.METRIC
-        }, (r, st)=> st==="OK" ? ok(r) : ng(new Error(st)));
-      });
-      (res.rows[0].elements||[]).forEach((el, j)=>{
-        if(el.status==="OK"){
-          out.push([part[j], Math.round(el.duration.value/60), el.distance.text.replace(/\s/g,"")]);
-        } else {
-          out.push([part[j], "", ""]);
-        }
-      });
+    if(!r){
+      box.innerHTML = '<p class="hint">調べています…</p>';
+      r = await surveyAddress(addr, {key: gkey(), onStep: m=>{ box.innerHTML = '<p class="hint">'+esc(m)+'</p>'; }});
+      cacheSet(addr, r);
+      from = "今回の調査";
     }
-    P[i].around = out.map(r=>r.join("\t")).join("\n");
-    const ta = document.querySelector(`textarea[data-p="${i}"][data-k="around"]`);
-    if(ta) ta.value = P[i].around;
+    P[i].survey = r;
+
+    /* 学区・学校 */
+    if(r.sho && r.sho.name){ P[i].elem = r.sho.name; }
+    if(r.chu && r.chu.name){ P[i].junior = r.chu.name; }
+    if(r.sho && r.chu){
+      P[i].school = `${r.sho.name}　徒歩${r.sho.mins}分／${r.chu.name}　徒歩${r.chu.mins}分`;
+    }
+    const sta = (r.stations||[])[0];
+    if(sta){ P[i].station = sta.name; P[i].access = `${sta.name}　徒歩${sta.mins}分`; }
+
+    /* 周辺施設は種類ごとに1つずつ、近い順に8件まで */
+    const seen = new Set(), pick = [];
+    (r.facilities||[]).forEach(f=>{
+      if(seen.has(f.cat)) return;
+      seen.add(f.cat); pick.push(f);
+    });
+    (r.facilities||[]).forEach(f=>{ if(pick.length<8 && !pick.includes(f)) pick.push(f); });
+    const rows = [];
+    if(r.sho) rows.push([r.sho.name, r.sho.mins, fmtM(r.sho.m)]);
+    if(r.chu) rows.push([r.chu.name, r.chu.mins, fmtM(r.chu.m)]);
+    if(sta)   rows.push([sta.name, sta.mins, fmtM(sta.m)]);
+    pick.slice(0, 8-rows.length).forEach(f=> rows.push([f.name, f.mins, fmtM(f.m)]));
+    P[i].around = rows.map(x=>x.join("\t")).join("\n");
+
+    /* 用途地域 */
+    const zs = (r.toshi && r.toshi.zones) || [];
+    P[i].youto = zs.length ? zs.map(z=>z.n).join("・") : (r.toshi ? r.toshi.layerName : "");
+    P[i].kenpei = zs.length ? zs.map(z=>z.b).join("・") : "";
+    P[i].yoseki = zs.length ? zs.map(z=>z.v).join("・") : "";
+    P[i].toshiku = r.toshi ? r.toshi.layerName : "";
+
+    syncProp(i);
+    await drawSurveyMap(i, rows);
     render();
-    const ng = out.filter(r=>!r[1]).length;
-    box.innerHTML = `${out.length - ng} 件の徒歩分数を入れました。`
-      + (ng ? `<br>${ng} 件は見つかりませんでした。施設名を正式名称にすると見つかりやすくなります。` : "");
+
+    const warn = (r.origin && r.origin.rough) ? "　※住所は番地から推定した位置です" : "";
+    box.innerHTML = `${esc(from)}の結果を反映しました（施設${rows.length}件・地図1枚）${warn}`
+      + `<br><button class="mini" onclick="runSurvey(${i}, true)">調べ直す</button>`;
   }catch(e){
-    box.innerHTML = "取得できませんでした：" + e.message
-      + '<br>Google Cloud の鍵の設定で <b>Maps JavaScript API</b> が許可されているか確認してください。';
+    box.innerHTML = "調べられませんでした：" + esc(e.message||String(e));
   }
 }
-
-/* 施設の種類と探す範囲（学校と駅は遠くても最寄りを必ず出す） */
-const SPOTS = [
-  {key:"super",  label:"スーパー",       types:["supermarket"],                  r:1500, take:3},
-  {key:"conv",   label:"コンビニ",       types:["convenience_store"],            r:1200, take:2},
-  {key:"drug",   label:"ドラッグストア", types:["drugstore","pharmacy"],         r:1500, take:2},
-  {key:"hosp",   label:"病院・クリニック", types:["hospital","doctor"],          r:2000, take:2},
-  {key:"park",   label:"公園",           types:["park"],                         r:1200, take:2},
-  {key:"sho",    label:"小学校",         types:["primary_school","school"],      r:6000, take:2, name:/小学校/},
-  {key:"chu",    label:"中学校",         types:["secondary_school","school"],    r:8000, take:2, name:/中学校/},
-  {key:"sta",    label:"駅",             types:["train_station","light_rail_station","subway_station"], r:6000, take:2}
-];
-let FOUND = [[],[]];
-
-async function findSpots(i){
-  const d = P[i], box = document.getElementById("maps"+i);
-  const from = (d.addr||"").trim();
-  if(!from){ box.innerHTML = '<p class="hint">先に所在地を入れてください。</p>'; return; }
-  box.innerHTML = '<p class="hint">周辺の施設を探しています…</p>';
-  try{
-    await loadGmaps();
-    if(!(google.maps.places && google.maps.places.Place))
-      throw new Error("地図の部品がそろっていません。ページを再読み込み（Ctrl+F5）してからもう一度お試しください");
-    const Place = google.maps.places.Place;
-    const RANK = google.maps.places.SearchNearbyRankPreference;
-
-    const geo = await new Promise((ok, ng)=>{
-      new google.maps.Geocoder().geocode({address: from, region:"jp"}, (r, st)=>
-        st==="OK" && r[0] ? ok(r[0].geometry.location) : ng(new Error("住所が見つかりません：" + st)));
-    });
-
-    const cand = [];
-    for(const sp of SPOTS){
-      try{
-        const {places} = await Place.searchNearby({
-          fields:["displayName","location"],
-          locationRestriction:{center: geo, radius: sp.r},
-          includedPrimaryTypes: sp.types,
-          maxResultCount: 8,
-          rankPreference: RANK ? RANK.DISTANCE : "DISTANCE",
-          language:"ja", region:"jp"
-        });
-        let list = places || [];
-        if(sp.name) list = list.filter(pl=>sp.name.test(pl.displayName||""));
-        list.slice(0, sp.take).forEach(pl=>
-          cand.push({cat: sp.label, nm: pl.displayName, loc: pl.location}));
-      }catch(e){ /* 見つからない種類は飛ばす */ }
-    }
-    if(!cand.length){ box.innerHTML = "周辺に施設が見つかりませんでした。所在地の書き方を変えてみてください。"; return; }
-
-    /* 徒歩分数をまとめて取る */
-    const svc = new google.maps.DistanceMatrixService();
-    for(let s0=0; s0<cand.length; s0+=20){
-      const part = cand.slice(s0, s0+20);
-      const res = await new Promise((ok, ng)=>{
-        svc.getDistanceMatrix({
-          origins:[from], destinations: part.map(x=>x.loc),
-          travelMode: google.maps.TravelMode.WALKING,
-          unitSystem: google.maps.UnitSystem.METRIC
-        }, (r, st)=> st==="OK" ? ok(r) : ng(new Error(st)));
-      });
-      (res.rows[0].elements||[]).forEach((el, j)=>{
-        if(el.status==="OK"){
-          part[j].min = Math.round(el.duration.value/60);
-          part[j].dist = el.distance.text.replace(/\s/g,"");
-        }
-      });
-    }
-    FOUND[i] = cand.filter(x=>x.min!==undefined).sort((a,b)=>a.min-b.min);
-    drawSpots(i);
-  }catch(e){
-    box.innerHTML = "探せませんでした：" + e.message
-      + '<br>鍵の設定で <b>Places API (New)</b> と <b>Maps JavaScript API</b> が許可されているか確認してください。';
-  }
+function fmtM(m){ return m>=1000 ? (m/1000).toFixed(1)+"km" : Math.round(m)+"m"; }
+function syncProp(i){
+  document.querySelectorAll(`[data-p="${i}"]`).forEach(el=>{
+    const k = el.dataset.k;
+    if(P[i][k]!==undefined) el.value = P[i][k];
+  });
 }
-/* 物件と選んだ施設を地図画像にする */
-async function makeMap(i){
-  const d = P[i], box = document.getElementById("maps"+i);
-  const from = (d.addr||"").trim();
-  if(!from){ box.innerHTML = '<p class="hint">先に所在地を入れてください。</p>'; return; }
-  box.innerHTML = '<p class="hint">地図を作っています…</p>';
-  try{
-    await loadGmaps();
-    const geo = await new Promise((ok, ng)=>{
-      new google.maps.Geocoder().geocode({address: from, region:"jp"}, (r, st)=>
-        st==="OK" && r[0] ? ok(r[0].geometry.location) : ng(new Error("住所が見つかりません：" + st)));
-    });
-    const c = geo.lat() + "," + geo.lng();
-
-    /* 選んだ施設にも印を付ける */
-    const picked = lines(d.around).map(l=>l.split(/\t| {2,}|,|、|　/)[0].trim()).filter(Boolean);
-    const spots = (FOUND[i]||[]).filter(x=>picked.includes(x.nm)).slice(0,12);
-    const pins = spots.map(x=>`&markers=size:small%7Ccolor:0xE07B1E%7C${x.loc.lat()},${x.loc.lng()}`).join("");
-
-    const base = "https://maps.googleapis.com/maps/api/staticmap";
-    const shots = [
-      {z:16, cap:"物件の周辺"},
-      {z:14, cap:"広域からの位置"}
-    ];
-    for(const sh of shots){
-      const url = `${base}?center=${c}&zoom=${sh.z}&size=640x800&scale=2&language=ja&region=JP`
-        + `&markers=size:mid%7Ccolor:0x16294B%7Clabel:P%7C${c}` + (sh.z>=16 ? pins : "")
-        + `&key=${GMAPS_KEY}`;
-      const dataUrl = await new Promise((ok, ng)=>{
-        const im = new Image();
-        im.crossOrigin = "anonymous";
-        im.onload = ()=>{
-          const cv = document.createElement("canvas");
-          cv.width = im.width; cv.height = im.height;
-          cv.getContext("2d").drawImage(im, 0, 0);
-          ok(cv.toDataURL("image/jpeg", 0.85));
-        };
-        im.onerror = ()=>ng(new Error("地図画像を取得できません"));
-        im.src = url;
-      });
-      P[i].imgs.push({src:dataUrl, cap:sh.cap, full:true});
-    }
-    renderImgList(i); render();
-    box.innerHTML = "地図を2枚（周辺・広域）取り込みました。画像一覧から差し替えや削除ができます。";
-  }catch(e){
-    box.innerHTML = "地図を作れませんでした：" + e.message
-      + '<br>鍵の設定で <b>Maps Static API</b> が許可されているか確認してください。';
-  }
-}
-function drawSpots(i){
-  const box = document.getElementById("maps"+i);
-  const cur = lines(P[i].around).map(l=>l.split(/\t| {2,}/)[0].trim());
-  box.innerHTML = `<p class="hint">載せたい施設にチェックを入れてください。徒歩の近い順です。</p>
-    <div class="picker" style="max-height:260px">` +
-    FOUND[i].map((x,j)=>`<label><input type="checkbox" ${cur.includes(x.nm)?"checked":""}
-        onchange="pickSpot(${i},${j},this.checked)">
-        <span style="flex:1">${esc(x.nm)}<span class="sub2" style="color:var(--sub);font-size:12px"> ${esc(x.cat)}</span></span>
-        <span class="cnt">徒歩${x.min}分 ${esc(x.dist||"")}</span></label>`).join("")
-    + `</div>`;
-}
-function pickSpot(i, j, on){
-  const x = FOUND[i][j];
-  let rows = lines(P[i].around).map(l=>l.split(/\t| {2,}|,|、|　/).map(v=>v.trim()));
-  if(on){
-    if(!rows.some(r=>r[0]===x.nm)) rows.push([x.nm, String(x.min), x.dist||""]);
-  } else {
-    rows = rows.filter(r=>r[0]!==x.nm);
-  }
-  P[i].around = rows.map(r=>r.join("\t")).join("\n");
-  const ta = document.querySelector(`textarea[data-p="${i}"][data-k="around"]`);
-  if(ta) ta.value = P[i].around;
-  render();
+/* 施設名入りの地図をA4一面で入れる */
+async function drawSurveyMap(i, rows){
+  const r = P[i].survey;
+  if(!r || typeof renderShuhenMap !== "function") return;
+  const names = rows.map(x=>x[0]);
+  const pts = [{lat:r.origin.lat, lng:r.origin.lng, name:"ご提案物件", kind:"prop"}];
+  const all = [r.sho, r.chu, ...(r.stations||[]).slice(0,1), ...(r.facilities||[])].filter(Boolean);
+  let n = 0;
+  all.forEach(f=>{
+    if(!names.includes(f.name) || !f.lat) return;
+    pts.push({lat:f.lat, lng:f.lng, name:f.name, kind:"fac", n:++n});
+  });
+  const cv = await renderShuhenMap({points:pts, w:1240, h:1600, labels:true, fontSize:24});
+  P[i].imgs = P[i].imgs.filter(im=>im.cap!=="周辺の地図");
+  P[i].imgs.push({src: cv.toDataURL("image/jpeg", 0.88), cap:"周辺の地図", full:true});
+  renderImgList(i);
 }
 
 /* ---------- 小学校区 ---------- */
@@ -1030,10 +932,7 @@ function drawPicker(id, key){
 /* 町名から校区名（確定なら1つ、候補なら配列） */
 function schoolNames(town){
   const r = schoolOf(town);
-  if(!r) return null;
-  if(r.confident && r.sho) return [r.sho];
-  if(r.candidates && r.candidates.length) return r.candidates;
-  return null;
+  return (r && r.candidates && r.candidates.length) ? r.candidates : null;
 }
 
 /* ---------- 表紙の写真 ---------- */
@@ -1056,15 +955,11 @@ let DB = null;
 async function loadDb(){
   const box = document.getElementById("dbBox");
   try{
-    if(typeof SchoolLookup === "undefined"){
-      const js = await (await fetch("school-lookup.js")).text();
-      (0,eval)(js);
-    }
     DB = await (await fetch("funnel-data.json")).json();
     afterDbLoad();
   }catch(e){
     box.innerHTML = "成約データを読み込めませんでした。<br>"
-      + "同じ場所に <b>funnel-data.json</b> と <b>school-lookup.js</b> を置いてください。"
+      + "同じ場所に <b>funnel-data.json</b> を置いてください。"
       + "（この画面で試す場合は下のボタンから2つ選んでください）";
     document.getElementById("dbPick").style.display = "inline-block";
   }
@@ -1074,11 +969,9 @@ async function loadDbFiles(input){
   try{
     for(const f of files){
       const t = await f.text();
-      if(/\.js$/i.test(f.name)) (0,eval)(t);
-      else DB = JSON.parse(t);
+      if(/\.json$/i.test(f.name)) DB = JSON.parse(t);
     }
-    if(!DB || typeof SchoolLookup === "undefined")
-      throw new Error("2つとも選んでください（funnel-data.json と school-lookup.js）");
+    if(!DB) throw new Error("funnel-data.json を選んでください");
     afterDbLoad();
   }catch(e){
     document.getElementById("dbBox").textContent = "読み込めませんでした：" + e.message;
@@ -1168,10 +1061,28 @@ function sdSuggest(){
   }
   return out.slice(0,4);
 }
-/* 町名から校区を引く（物件カード用） */
-function schoolOf(town){
-  if(!DB || typeof SchoolLookup === "undefined" || !town) return null;
-  try{ return SchoolLookup.of(town, DB.school, DB.override); }catch(e){ return null; }
+/* 町名・住所から校区を引く（周辺環境調査シートと同じ判定） */
+function schoolOf(addr){
+  if(!addr || typeof lookupGakku !== "function") return null;
+  try{
+    const g = lookupGakku(addr);
+    if(!g.hits.length) return null;
+    const sho = [...new Set(g.hits.map(h=>h.e).filter(Boolean))];
+    const chu = [...new Set(g.hits.map(h=>h.m).filter(Boolean))];
+    const caution = g.hits.map(h=>h.caution).filter(Boolean)[0] || null;
+    return {
+      sho: sho.length===1 ? sho[0] : null,
+      candidates: sho,
+      chu: chu.length===1 ? chu[0] : (chu[0]||null),
+      chuList: chu,
+      confident: sho.length===1,
+      mode: g.mode,
+      caution,
+      label: sho.length===1 ? sho[0]+"小学校"
+           : sho.length ? sho.map(x=>x+"小学校").join("または")+"。詳しくはお調べください。"
+           : "（校区は要確認）"
+    };
+  }catch(e){ return null; }
 }
 
 /* ---------- Zohoの顧客情報を読み取る ---------- */
@@ -1206,24 +1117,6 @@ function parseZoho(){
   syncInputs(); render();
   out.innerHTML = got.length ? "読み取りました：" + got.join("　／　")
     : "拾えませんでした。氏名の行が含まれているか確認してください。";
-}
-
-/* ---------- 地図リンクの一括生成 ---------- */
-function mapLinks(i){
-  const d = P[i], box = document.getElementById("maps"+i);
-  const from = (d.addr||"").trim();
-  if(!from){ box.innerHTML = '<p class="hint">先に所在地を入れてください。</p>'; return; }
-  const A = (href, label) => `<a class="mini" style="display:inline-block;margin:4px 4px 0 0;text-decoration:none"
-      href="${href}" target="_blank" rel="noopener">${label}</a>`;
-  const route = (to, label) => to ? A(
-      `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(from)}&destination=${encodeURIComponent(to)}&travelmode=walking`,
-      label) : "";
-  const near = (q) => A(
-      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q+" "+from)}`, q);
-  box.innerHTML =
-    '<p class="hint">クリックすると地図が開きます。画面を撮って、下の「画像を追加」で取り込んでください。</p>' +
-    route(d.station,"駅まで") + route(d.elem,"小学校まで") + route(d.junior,"中学校まで") +
-    ["スーパー","コンビニ","ドラッグストア","病院","公園"].map(near).join("");
 }
 
 /* ---------- 図面PDFを画像として取り込む ---------- */
@@ -1840,10 +1733,12 @@ function render(){
   add(p => pageDoor(p));
   add(p => pageProp(0, p));
   add(p => pageAround(0, p));
+  add(p => pageFacil(0, p));
   addMany(p => pageFull(0, p));
   add(p => pageImgs(0, p));
   add(p => pageProp(1, p));
   add(p => pageAround(1, p));
+  add(p => pageFacil(1, p));
   addMany(p => pageFull(1, p));
   add(p => pageImgs(1, p));
   add(p => pageCompare(p));
@@ -1959,7 +1854,7 @@ function pageProp(i, no){
     ["築年月", d.built], ["間取り", d.plan], ["構造・階数", d.floor],
     ["前面道路", d.road], ["通学先", d.school], ["周辺施設", d.life]
   ];
-  const sc = schoolOf((d.addr||"").replace(/^.*?[市区]/,"").replace(/\d+[-－‐].*$/,"").trim());
+  const sc = schoolOf(d.addr);
   if(sc) spec.splice(7, 0, ["校区", sc.label + (sc.chu ? `／${sc.chu}中学校` : "")]);
   let t = `<table class="spec">`;
   spec.forEach(([l,v])=> t += `<tr><th>${l}</th><td>${v? esc(v) : '<span class="empty">—</span>'}</td></tr>`);
@@ -1969,6 +1864,16 @@ function pageProp(i, no){
 
   const small = d.imgs.filter(im=>!im.full);
   const first = small[0];
+  const zone = (d.youto || d.kenpei || d.yoseki) ? `
+    <div class="money-grid" style="margin-top:14px">
+      <div class="money"><div class="lbl">用途地域</div>
+        <div class="val" style="font-size:15pt;line-height:1.35">${esc(d.youto||"—")}</div>
+        ${d.toshiku?`<div class="lbl" style="margin-top:4px">${esc(d.toshiku)}</div>`:""}</div>
+      <div class="money hi"><div class="lbl">建ぺい率</div>
+        <div class="val">${esc(d.kenpei||"—")}<small>％</small></div></div>
+      <div class="money hi"><div class="lbl">容積率</div>
+        <div class="val">${esc(d.yoseki||"—")}<small>％</small></div></div>
+    </div>` : "";
   const img = first
     ? `<div class="imgcell" style="margin-top:14px"><img src="${first.src}" alt="">
        ${first.cap?`<div class="cap">${esc(first.cap)}</div>`:""}</div>`
@@ -1977,7 +1882,7 @@ function pageProp(i, no){
   return shell(no+"枚目：物件"+(i+1),"",
     head("物件"+(i===0?"①":"②")) +
     `<div class="price-bar"><span class="addr">${esc(d.addr||"所在地未入力")}</span>
-      <span class="p">${man(p)}<small>万円</small></span></div>` + t + img);
+      <span class="p">${man(p)}<small>万円</small></span></div>` + t + zone + img);
 }
 function pageImgs(i, no){
   const rest = P[i].imgs.filter(im=>!im.full).slice(1, 5);
@@ -2020,7 +1925,7 @@ function pageAround(i, no){
   }).join("");
 
   return shell(no+"枚目：物件"+(i+1)+" 周辺環境図","",
-    head("物件"+(i===0?"①":"②")+"　周辺環境", "この物件から歩いた時間です") +
+    head("物件"+(i===0?"①":"②")+"　周辺環境", "この物件から歩いたときの時間です") +
     `<div class="around">
        <div class="hub"><b>ご提案物件</b><span>${esc(d.addr||"")}</span></div>${spots}
      </div>`);
@@ -2103,6 +2008,25 @@ function pageDoor(no){
     <img src="${COVER}" alt="">
     <div class="cap">暮らしに家を合わせる。ViVi不動産のリノベーション</div>
     <div class="foot"><span>${esc(S.customer||"　")} 様</span><span>${esc(S.company||"")}</span></div></div>`;
+}
+function pageFacil(i, no){
+  const rows = lines(P[i].around).map(l=>{
+    const c = l.split(/\t| {2,}|,|、|　/).map(x=>x.trim()).filter(x=>x!=="");
+    return {nm:c[0]||"", min:c[1]||"", dist:c[2]||""};
+  }).filter(x=>x.nm);
+  if(rows.length < 5) return "";
+  const body = rows.map(x=>`<tr>
+      <td class="name" style="font-size:13pt">${esc(x.nm)}</td>
+      <td style="text-align:center;font-size:17pt;font-weight:800;color:var(--orange)">
+        ${esc(x.min)}<span style="font-size:11pt;color:var(--sub)">分</span></td>
+      <td style="text-align:center;font-size:13pt">${esc(x.dist)}</td></tr>`).join("");
+  return shell(no+"枚目：物件"+(i+1)+" 周辺施設","",
+    head("物件"+(i===0?"①":"②")+"　周辺の施設", esc(P[i].addr||"")) +
+    `<table class="list" style="margin-top:12px"><thead><tr>
+      <th>施設</th><th>徒歩</th><th>道のり</th></tr></thead><tbody>${body}</tbody></table>
+     <p class="legend-note" style="margin-top:16px">
+       ※ 徒歩分数は道のりを分速80mで換算し、1分未満を切り上げています。<br>
+       ※ 実際にかかる時間は信号待ちや歩く速さにより前後します。</p>`);
 }
 function pageCompare(no){
   const cell = (i)=>{

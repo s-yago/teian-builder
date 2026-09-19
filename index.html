@@ -819,7 +819,11 @@ async function runSurvey(i, force){
       P[i].school = `${r.sho.name}　徒歩${r.sho.mins}分／${r.chu.name}　徒歩${r.chu.mins}分`;
     }
     const sta = (r.stations||[])[0];
-    if(sta){ P[i].station = sta.name; P[i].access = `${sta.name}　徒歩${sta.mins}分`; }
+    if(sta){
+      P[i].station = sta.name;
+      const ln = (sta.line||"").split("／").slice(0,2).join("／");
+      P[i].access = (ln ? ln+"　" : "") + `${sta.name}　徒歩${sta.mins}分`;
+    }
 
     /* 周辺施設は種類ごとに1つずつ、近い順に8件まで */
     const seen = new Set(), pick = [];
@@ -831,7 +835,10 @@ async function runSurvey(i, force){
     const rows = [];
     if(r.sho) rows.push([r.sho.name, r.sho.mins, fmtM(r.sho.m)]);
     if(r.chu) rows.push([r.chu.name, r.chu.mins, fmtM(r.chu.m)]);
-    if(sta)   rows.push([sta.name, sta.mins, fmtM(sta.m)]);
+    if(sta){
+      const ln = (sta.line||"").split("／")[0];
+      rows.push([(ln?ln+" ":"")+sta.name, sta.mins, fmtM(sta.m)]);
+    }
     pick.slice(0, 8-rows.length).forEach(f=> rows.push([f.name, f.mins, fmtM(f.m)]));
     P[i].around = rows.map(x=>x.join("\t")).join("\n");
 

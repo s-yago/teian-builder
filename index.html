@@ -473,6 +473,7 @@ body.mode-sim .page:not(.scope-sim){display:none;}
     <div class="calc" id="dbBox">データを読み込んでいます…</div>
     <button class="mini" id="dbPick" style="display:none"
       onclick="document.getElementById('dbFiles').click()">データファイルを選ぶ</button>
+    <button class="mini" id="dbClear" style="display:none" onclick="clearDbCache()">このパソコンの保存データを消す</button>
     <input type="file" id="dbFiles" multiple accept=".json" style="display:none" onchange="loadDbFiles(this)">
 
     <div class="toggle"><input type="checkbox" data-k="useDb"><span>成約データのページを載せる</span></div>
@@ -1046,36 +1047,104 @@ function probeCover(){
 
 /* ---------- 成約データ（funnel-data.json / school-lookup.js） ---------- */
 let DB = null;
+/* 成約データは社外秘のため、GitHubには置かない。
+   共有ドライブ「ViVi社内ツール用データ（社外秘）」から funnel-data.json をダウンロードして選ぶ。
+   一度選ぶと、このパソコンのブラウザ（IndexedDB）に保存され、次回からは自動で読み込む。 */
+const DB_IDB = { name: "vivi_teian_builder", store: "kv", key: "funnel_data" };
+function idbOpen(){
+  return new Promise((ok, ng) => {
+    if(!window.indexedDB) return ng(new Error("このブラウザは保存に対応していません"));
+    const rq = indexedDB.open(DB_IDB.name, 1);
+    rq.onupgradeneeded = () => rq.result.createObjectStore(DB_IDB.store);
+    rq.onsuccess = () => ok(rq.result);
+    rq.onerror = () => ng(rq.error);
+  });
+}
+async function idbGet(){
+  const db = await idbOpen();
+  return new Promise((ok, ng) => {
+    const rq = db.transaction(DB_IDB.store, "readonly").objectStore(DB_IDB.store).get(DB_IDB.key);
+    rq.onsuccess = () => ok(rq.result || null);
+    rq.onerror = () => ng(rq.error);
+  });
+}
+async function idbSet(val){
+  const db = await idbOpen();
+  return new Promise((ok, ng) => {
+    const tx = db.transaction(DB_IDB.store, "readwrite");
+    tx.objectStore(DB_IDB.store).put(val, DB_IDB.key);
+    tx.oncomplete = () => ok(true);
+    tx.onerror = () => ng(tx.error);
+  });
+}
+async function idbDel(){
+  const db = await idbOpen();
+  return new Promise((ok, ng) => {
+    const tx = db.transaction(DB_IDB.store, "readwrite");
+    tx.objectStore(DB_IDB.store).delete(DB_IDB.key);
+    tx.oncomplete = () => ok(true);
+    tx.onerror = () => ng(tx.error);
+  });
+}
+function dbIsValid(d){
+  return d && d.sold_mansion && Array.isArray(d.sold_mansion.recs)
+           && d.sold_kodate && Array.isArray(d.sold_kodate.recs);
+}
+function showDbMissing(msg){
+  DB = null;
+  document.getElementById("dbBox").innerHTML = (msg ? msg + "<br>" : "")
+    + "成約データがまだこのパソコンに入っていません。<br>"
+    + "共有ドライブ「<b>ViVi社内ツール用データ（社外秘）</b>」→「REINS成約データ」から "
+    + "<b>funnel-data.json</b> をダウンロードし、下のボタンで選んでください。<br>"
+    + "一度選べば、次回からは自動で読み込みます。";
+  document.getElementById("dbPick").textContent = "データファイルを選ぶ";
+  document.getElementById("dbPick").style.display = "inline-block";
+  document.getElementById("dbClear").style.display = "none";
+  render();
+}
 async function loadDb(){
-  const box = document.getElementById("dbBox");
   try{
-    DB = await (await fetch("funnel-data.json")).json();
-    afterDbLoad();
-  }catch(e){
-    box.innerHTML = "成約データを読み込めませんでした。<br>"
-      + "同じ場所に <b>funnel-data.json</b> を置いてください。"
-      + "（この画面で試す場合は下のボタンから2つ選んでください）";
-    document.getElementById("dbPick").style.display = "inline-block";
-  }
+    const saved = await idbGet();
+    if(dbIsValid(saved)){ DB = saved; afterDbLoad(true); return; }
+  }catch(e){}
+  showDbMissing("");
 }
 async function loadDbFiles(input){
   const files = [...input.files]; input.value = "";
   try{
+    let d = null;
     for(const f of files){
-      const t = await f.text();
-      if(/\.json$/i.test(f.name)) DB = JSON.parse(t);
+      if(/\.json$/i.test(f.name)) d = JSON.parse(await f.text());
     }
-    if(!DB) throw new Error("funnel-data.json を選んでください");
-    afterDbLoad();
+    if(!dbIsValid(d)) throw new Error("funnel-data.json を選んでください");
+    DB = d;
+    let saved = true;
+    try{ await idbSet(d); }catch(e){ saved = false; }
+    afterDbLoad(true, saved);
   }catch(e){
     document.getElementById("dbBox").textContent = "読み込めませんでした：" + e.message;
+    document.getElementById("dbPick").style.display = "inline-block";
   }
 }
-function afterDbLoad(){
-  document.getElementById("dbPick").style.display = "none";
+async function clearDbCache(){
+  if(!confirm("このパソコンに保存した成約データを消します。よろしいですか？")) return;
+  try{ await idbDel(); }catch(e){}
+  showDbMissing("保存データを消しました。");
+}
+function afterDbLoad(fromSaved, saved){
+  const d = DB.exported ? String(DB.exported).slice(0,10) : "";
+  const note = saved === false
+    ? "<br><span style=\"color:#b4453a\">※このパソコンには保存できませんでした。次回もファイルを選んでください。</span>"
+    : "<br>このパソコンに保存済み（次回から自動で読み込みます）";
   document.getElementById("dbBox").innerHTML =
     `成約データ読み込み済み　マンション <b>${DB.sold_mansion.recs.length}</b> 件　`
-    + `戸建て <b>${DB.sold_kodate.recs.length}</b> 件`;
+    + `戸建て <b>${DB.sold_kodate.recs.length}</b> 件`
+    + (d ? `<br>データの作成日：${d}` : "")
+    + note;
+  const pick = document.getElementById("dbPick");
+  pick.textContent = "新しいデータに入れ替える";
+  pick.style.display = "inline-block";
+  document.getElementById("dbClear").style.display = "inline-block";
   render();
 }
 /* 校区は「候補に含まれる」ものも数に入れる */
